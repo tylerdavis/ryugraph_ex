@@ -1,0 +1,9 @@
+[tools]
+rust = "latest"
+erlang = "latest"
+elixir = "latest"
+
+[env]
+# Optional: Set environment variables if needed
+# For example, you can set Rust's cargo home
+# CARGO_HOME = "~/.cargo"
