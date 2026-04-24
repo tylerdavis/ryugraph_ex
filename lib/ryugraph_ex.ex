@@ -136,4 +136,9 @@ defmodule RyugraphEx do
   Returns the version of the RyugraphEx library.
   """
   def version, do: "0.1.0"
+
+  @doc """
+  Returns :world for testing purposes.
+  """
+  def hello, do: :world
 end

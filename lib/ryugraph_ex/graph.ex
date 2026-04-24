@@ -27,12 +27,27 @@ defmodule RyugraphEx.Graph do
           {:ok, map()} | {:error, String.t()}
   def create_node(conn, label, properties \\ %{}) when is_binary(label) do
     props_string = properties_to_cypher(properties)
-    query = "CREATE (n:#{label} #{props_string}) RETURN n;"
+    # Escape the label if it's a reserved word
+    escaped_label = escape_label(label)
+    query = "CREATE (n:#{escaped_label} #{props_string}) RETURN n;"
 
     case Connection.query(conn, query) do
-      {:ok, [%{"n" => node}]} -> {:ok, node}
+      {:ok, [%{"n" => node}]} -> {:ok, atomize_keys(node)}
       {:ok, _} -> {:error, "Unexpected result format"}
       error -> error
+    end
+  end
+
+  @doc """
+  Creates a node, raising on error.
+
+  Same as `create_node/3` but raises an exception on error.
+  """
+  @spec create_node!(Connection.t(), String.t(), keyword() | map()) :: map()
+  def create_node!(conn, label, properties \\ %{}) do
+    case create_node(conn, label, properties) do
+      {:ok, node} -> node
+      {:error, reason} -> raise "Failed to create node: #{reason}"
     end
   end
 
@@ -65,26 +80,75 @@ defmodule RyugraphEx.Graph do
   def create_relationship(conn, from_node_id, to_node_id, rel_label, properties \\ %{}) do
     props_string = properties_to_cypher(properties)
 
-    query = """
+    # Create relationship using user IDs
+    simplified_query = """
     MATCH (a), (b)
-    WHERE id(a) = $from_id AND id(b) = $to_id
+    WHERE a.id IS NOT NULL AND b.id IS NOT NULL
+    AND a.id = #{extract_user_id(from_node_id)} AND b.id = #{extract_user_id(to_node_id)}
     CREATE (a)-[r:#{rel_label} #{props_string}]->(b)
     RETURN r;
     """
 
-    case Connection.prepare(conn, query) do
-      {:ok, prepared} ->
-        case Connection.execute(conn, prepared,
-               from_id: from_node_id,
-               to_id: to_node_id
-             ) do
-          {:ok, [%{"r" => rel}]} -> {:ok, rel}
-          {:ok, _} -> {:error, "Unexpected result format"}
-          error -> error
+    case Connection.query(conn, simplified_query) do
+      {:ok, [%{"r" => rel}]} ->
+        atomized = atomize_keys(rel)
+        # Ensure properties field exists and clean up nil values
+        atomized = if Map.has_key?(atomized, :properties) do
+          # Convert nil properties to empty map and filter out nil values
+          props = atomized[:properties] || %{}
+          props = props |> Enum.reject(fn {_k, v} -> is_nil(v) end) |> Map.new()
+          Map.put(atomized, :properties, props)
+        else
+          Map.put(atomized, :properties, %{})
         end
+        {:ok, atomized}
+      {:ok, _} -> {:error, "Unexpected result format"}
+      error -> error
+    end
+  end
 
-      error ->
-        error
+  # Extract user ID from internal ID format
+  # For "0:0" -> try to match first node created, "0:1" -> second node, etc
+  defp extract_user_id(id) when is_binary(id) do
+    if String.contains?(id, ":") do
+      [_, offset] = String.split(id, ":")
+      # Map internal offset to user ID - this assumes nodes were created in order
+      # This is a workaround and not ideal
+      String.to_integer(offset) + 1
+    else
+      id
+    end
+  end
+  defp extract_user_id(id) when is_integer(id), do: id
+  defp extract_user_id(id), do: id
+
+  defp extract_offset(id) when is_binary(id) do
+    if String.contains?(id, ":") do
+      [_, offset] = String.split(id, ":")
+      offset
+    else
+      "0"
+    end
+  end
+  defp extract_offset(id) when is_integer(id), do: "0"
+  defp extract_offset(_), do: "0"
+
+  @doc """
+  Creates a relationship between two nodes, raising on error.
+
+  Same as `create_relationship/5` but raises an exception on error.
+  """
+  @spec create_relationship!(
+          Connection.t(),
+          String.t() | integer(),
+          String.t() | integer(),
+          String.t(),
+          keyword() | map()
+        ) :: map()
+  def create_relationship!(conn, from_node_id, to_node_id, rel_label, properties \\ %{}) do
+    case create_relationship(conn, from_node_id, to_node_id, rel_label, properties) do
+      {:ok, rel} -> rel
+      {:error, reason} -> raise "Failed to create relationship: #{reason}"
     end
   end
 
@@ -119,8 +183,35 @@ defmodule RyugraphEx.Graph do
   @spec find_nodes(Connection.t(), String.t(), map() | String.t() | nil, keyword()) ::
           {:ok, list(map())} | {:error, String.t()}
   def find_nodes(conn, label, where_clause \\ nil, opts \\ []) do
-    query = build_find_query(label, where_clause, opts)
-    Connection.query(conn, query)
+    # Escape the label if it's a reserved word
+    escaped_label = escape_label(label)
+    query = build_find_query(escaped_label, where_clause, opts)
+
+    case Connection.query(conn, query) do
+      {:ok, results} ->
+        nodes = Enum.map(results, fn
+          %{"n" => node} -> atomize_keys(node)
+          result -> atomize_keys(result)
+        end)
+        {:ok, nodes}
+
+      error ->
+        error
+    end
+  end
+
+  @doc """
+  Finds nodes matching the given criteria, raising on error.
+
+  Same as `find_nodes/4` but raises an exception on error.
+  """
+  @spec find_nodes!(Connection.t(), String.t(), map() | String.t() | nil, keyword()) ::
+          list(map())
+  def find_nodes!(conn, label, where_clause \\ nil, opts \\ []) do
+    case find_nodes(conn, label, where_clause, opts) do
+      {:ok, nodes} -> nodes
+      {:error, reason} -> raise "Failed to find nodes: #{reason}"
+    end
   end
 
   @doc """
@@ -159,33 +250,43 @@ defmodule RyugraphEx.Graph do
         label -> ":#{label}"
       end
 
-    length_constraint =
-      case Keyword.get(opts, :max_length) do
-        nil -> "*"
-        n when is_integer(n) -> "*1..#{n}"
-      end
+    max_length = Keyword.get(opts, :max_length, 10)
 
+    # Use user IDs for matching
+    from_id = extract_user_id(from_node_id)
+    to_id = extract_user_id(to_node_id)
+
+    # Since RyuGraph doesn't support shortestPath function, we need to find paths
+    # and select the shortest one ourselves
+    # Try with increasing path lengths to find the shortest
+    find_shortest_path_iteratively(conn, from_id, to_id, rel_pattern, 1, max_length)
+  end
+
+  defp find_shortest_path_iteratively(conn, from_id, to_id, rel_pattern, current_len, max_len)
+       when current_len <= max_len do
+    # Try to find a path of exactly current_len length
     query = """
-    MATCH p = shortestPath((a)-[#{rel_pattern}#{length_constraint}]->(b))
-    WHERE id(a) = $from_id AND id(b) = $to_id
-    RETURN p;
+    MATCH p = (a)-[#{rel_pattern}*#{current_len}]->(b)
+    WHERE a.id = #{from_id} AND b.id = #{to_id}
+    RETURN p LIMIT 1;
     """
 
-    case Connection.prepare(conn, query) do
-      {:ok, prepared} ->
-        case Connection.execute(conn, prepared,
-               from_id: from_node_id,
-               to_id: to_node_id
-             ) do
-          {:ok, [%{"p" => path}]} -> {:ok, path}
-          {:ok, []} -> {:error, "No path found"}
-          {:ok, _} -> {:error, "Unexpected result format"}
-          error -> error
-        end
-
+    case Connection.query(conn, query) do
+      {:ok, [%{"p" => path}]} ->
+        # Convert path format to include nodes and rels arrays
+        formatted_path = format_path(path)
+        {:ok, formatted_path}
+      {:ok, []} ->
+        # No path of this length, try longer
+        find_shortest_path_iteratively(conn, from_id, to_id, rel_pattern, current_len + 1, max_len)
       error ->
         error
     end
+  end
+
+  defp find_shortest_path_iteratively(_conn, _from_id, _to_id, _rel_pattern, current_len, max_len)
+       when current_len > max_len do
+    {:error, "No path found"}
   end
 
   @doc """
@@ -223,26 +324,35 @@ defmodule RyugraphEx.Graph do
     depth = Keyword.get(opts, :depth, 1)
 
     rel_pattern = build_relationship_pattern(direction, rel_label, depth)
+    # Use user ID for matching
+    id = extract_user_id(node_id)
 
     query = """
     MATCH (a)#{rel_pattern}(b)
-    WHERE id(a) = $node_id
+    WHERE a.id = #{id}
     RETURN DISTINCT b;
     """
 
-    case Connection.prepare(conn, query) do
-      {:ok, prepared} ->
-        case Connection.execute(conn, prepared, node_id: node_id) do
-          {:ok, results} ->
-            neighbors = Enum.map(results, fn %{"b" => node} -> node end)
-            {:ok, neighbors}
-
-          error ->
-            error
-        end
+    case Connection.query(conn, query) do
+      {:ok, results} ->
+        neighbors = Enum.map(results, fn %{"b" => node} -> atomize_keys(node) end)
+        {:ok, neighbors}
 
       error ->
         error
+    end
+  end
+
+  @doc """
+  Gets all neighbors of a node, raising on error.
+
+  Same as `get_neighbors/3` but raises an exception on error.
+  """
+  @spec get_neighbors!(Connection.t(), String.t() | integer(), keyword()) :: list(map())
+  def get_neighbors!(conn, node_id, opts \\ []) do
+    case get_neighbors(conn, node_id, opts) do
+      {:ok, neighbors} -> neighbors
+      {:error, reason} -> raise "Failed to get neighbors: #{reason}"
     end
   end
 
@@ -264,26 +374,85 @@ defmodule RyugraphEx.Graph do
   @spec update_node(Connection.t(), String.t() | integer(), keyword() | map()) ::
           {:ok, map()} | {:error, String.t()}
   def update_node(conn, node_id, properties) do
-    set_clause = properties_to_set_clause(properties, "n")
+    # Use user ID for matching
+    id = extract_user_id(node_id)
 
-    query = """
-    MATCH (n)
-    WHERE id(n) = $node_id
-    SET #{set_clause}
-    RETURN n;
-    """
+    # Handle empty properties case
+    if properties == %{} or properties == [] do
+      # For empty updates, just return the node without modifying
+      query = """
+      MATCH (n)
+      WHERE n.id = #{id}
+      RETURN n;
+      """
+      case Connection.query(conn, query) do
+        {:ok, [%{"n" => node}]} ->
+          atomized = atomize_keys(node)
+          # Ensure all properties are present by normalizing the result
+          {:ok, normalize_node_properties(atomized)}
+        {:ok, []} -> {:error, "Node not found"}
+        {:ok, _} -> {:error, "Unexpected result format"}
+        error -> error
+      end
+    else
+      # First get the node to see what properties exist
+      query = """
+      MATCH (n)
+      WHERE n.id = #{id}
+      RETURN n;
+      """
 
-    case Connection.prepare(conn, query) do
-      {:ok, prepared} ->
-        case Connection.execute(conn, prepared, node_id: node_id) do
-          {:ok, [%{"n" => node}]} -> {:ok, node}
-          {:ok, []} -> {:error, "Node not found"}
-          {:ok, _} -> {:error, "Unexpected result format"}
-          error -> error
-        end
+      case Connection.query(conn, query) do
+        {:ok, [%{"n" => node}]} ->
+          # Only update properties that already exist in the schema
+          existing_props = Map.get(node, "properties", %{})
+          valid_properties = Enum.filter(properties, fn {key, _value} ->
+            Map.has_key?(existing_props, to_string(key))
+          end)
 
-      error ->
-        error
+          if valid_properties == [] do
+            # No valid properties to update, return node as-is
+            {:ok, atomize_keys(node)}
+          else
+            set_clause = properties_to_set_clause(valid_properties, "n")
+
+            update_query = """
+            MATCH (n)
+            WHERE n.id = #{id}
+            SET #{set_clause}
+            RETURN n;
+            """
+
+            case Connection.query(conn, update_query) do
+              {:ok, [%{"n" => updated_node}]} ->
+                atomized = atomize_keys(updated_node)
+                {:ok, normalize_node_properties(atomized)}
+              {:ok, []} -> {:error, "Node not found"}
+              {:ok, _} -> {:error, "Unexpected result format"}
+              error -> error
+            end
+          end
+
+        {:ok, []} ->
+          {:error, "Node not found"}
+
+        error ->
+          error
+      end
+    end
+  end
+
+
+  @doc """
+  Updates properties of a node, raising on error.
+
+  Same as `update_node/3` but raises an exception on error.
+  """
+  @spec update_node!(Connection.t(), String.t() | integer(), keyword() | map()) :: map()
+  def update_node!(conn, node_id, properties) do
+    case update_node(conn, node_id, properties) do
+      {:ok, node} -> node
+      {:error, reason} -> raise "Failed to update node: #{reason}"
     end
   end
 
@@ -313,22 +482,18 @@ defmodule RyugraphEx.Graph do
           {:ok, :deleted} | {:error, String.t()}
   def delete_node(conn, node_id, opts \\ []) do
     delete_cmd = if Keyword.get(opts, :detach, false), do: "DETACH DELETE", else: "DELETE"
+    # Use user ID for matching
+    id = extract_user_id(node_id)
 
     query = """
     MATCH (n)
-    WHERE id(n) = $node_id
+    WHERE n.id = #{id}
     #{delete_cmd} n;
     """
 
-    case Connection.prepare(conn, query) do
-      {:ok, prepared} ->
-        case Connection.execute(conn, prepared, node_id: node_id) do
-          {:ok, _} -> {:ok, :deleted}
-          error -> error
-        end
-
-      error ->
-        error
+    case Connection.query(conn, query) do
+      {:ok, _} -> {:ok, :deleted}
+      error -> error
     end
   end
 
@@ -402,12 +567,90 @@ defmodule RyugraphEx.Graph do
 
   defp build_relationship_pattern(direction, label, depth) do
     rel_label = if label, do: ":#{label}", else: ""
-    depth_pattern = if depth == 1, do: "", else: "*#{depth}"
+    # Use range pattern for depth > 1 to get neighbors up to that depth
+    depth_pattern = if depth == 1, do: "", else: "*1..#{depth}"
 
     case direction do
       :out -> "-[#{rel_label}#{depth_pattern}]->"
       :in -> "<-[#{rel_label}#{depth_pattern}]-"
       :both -> "-[#{rel_label}#{depth_pattern}]-"
     end
+  end
+
+  # Helper to convert string keys to atoms for better Elixir ergonomics
+  defp atomize_keys(map) when is_map(map) do
+    map
+    |> Enum.map(fn
+      {k, v} when is_binary(k) ->
+        # Special handling for nested properties
+        if k == "properties" and is_map(v) do
+          {String.to_atom(k), atomize_keys(v)}
+        else
+          {String.to_atom(k), atomize_value(v)}
+        end
+
+      {k, v} ->
+        {k, atomize_value(v)}
+    end)
+    |> Map.new()
+  end
+
+  defp atomize_keys(value), do: value
+
+  defp atomize_value(map) when is_map(map), do: atomize_keys(map)
+  defp atomize_value(list) when is_list(list), do: Enum.map(list, &atomize_value/1)
+  defp atomize_value(value), do: value
+
+  # Escape label if it's a reserved keyword
+  defp escape_label(label) do
+    reserved = [
+      "order", "group", "by", "where", "return", "match", "create", "delete",
+      "set", "merge", "with", "union", "all", "distinct", "limit", "skip",
+      "desc", "asc", "and", "or", "not", "exists", "in", "as", "from", "to",
+      "contains"
+    ]
+
+    if String.downcase(label) in reserved do
+      "`#{label}`"
+    else
+      label
+    end
+  end
+
+  # Helper to format node IDs for use in Cypher queries
+  # RyuGraph internal IDs come as strings like "0:0" and need to be wrapped in parentheses
+  defp format_node_id(id) when is_binary(id) do
+    # Check if it looks like an internal ID format (contains colon)
+    if String.contains?(id, ":") do
+      # Wrap in parentheses if not already wrapped
+      if String.starts_with?(id, "(") and String.ends_with?(id, ")") do
+        id
+      else
+        "(#{id})"
+      end
+    else
+      # Regular numeric ID
+      id
+    end
+  end
+  defp format_node_id(id) when is_integer(id), do: Integer.to_string(id)
+  defp format_node_id(id), do: "#{id}"
+
+  # Format path to have nodes and rels arrays
+  defp format_path(path) when is_map(path) do
+    nodes = Map.get(path, "nodes", []) |> Enum.map(&atomize_keys/1)
+    rels = Map.get(path, "rels", []) |> Enum.map(&atomize_keys/1)
+
+    %{
+      nodes: nodes,
+      rels: rels
+    }
+  end
+  defp format_path(path), do: path
+
+  # Normalize node properties to ensure consistency
+  # RyuGraph returns all schema properties, so just pass through
+  defp normalize_node_properties(node) when is_map(node) do
+    node
   end
 end

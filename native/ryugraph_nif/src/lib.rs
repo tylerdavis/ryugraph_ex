@@ -1,6 +1,7 @@
 use parking_lot::Mutex;
 use rustler::{Encoder, Env, Error, NifResult, OwnedBinary, ResourceArc, Term};
-use ryugraph::{Connection, Database, SystemConfig, Value};
+use ryugraph::{Connection, Database, PreparedStatement, SystemConfig, Value, QueryResult};
+use std::collections::HashMap;
 use std::sync::Arc;
 use thiserror::Error;
 
@@ -61,24 +62,41 @@ impl Encoder for RyugraphError {
     }
 }
 
-// Resource wrapper for Database
+// Resource wrapper for Database - we'll leak it to get 'static lifetime
 struct DatabaseResource {
-    db: Arc<Mutex<Database>>,
+    db: Arc<Database>,
 }
 
-// Resource wrapper for Connection
+// Resource wrapper for Connection with leaked database reference
 struct ConnectionResource {
     conn: Arc<Mutex<Connection<'static>>>,
+    _db: Arc<Database>, // Keep database alive
 }
 
-// Simple wrapper for prepared statement ID - we'll manage statements differently
+// Resource wrapper for PreparedStatement - using raw pointer for Send/Sync
 struct PreparedStatementResource {
-    id: Arc<Mutex<u64>>,
+    stmt: *mut PreparedStatement,
+    _conn: Arc<Mutex<Connection<'static>>>, // Keep connection alive
+}
+
+// Implement Send and Sync manually for PreparedStatementResource
+unsafe impl Send for PreparedStatementResource {}
+unsafe impl Sync for PreparedStatementResource {}
+
+// Implement Drop to clean up the raw pointer
+impl Drop for PreparedStatementResource {
+    fn drop(&mut self) {
+        unsafe {
+            // Clean up the raw pointer
+            let _ = Box::from_raw(self.stmt);
+        }
+    }
 }
 
 // Helper function to convert SystemConfig from Elixir keyword list
 fn parse_system_config(config_term: Term) -> NifResult<SystemConfig> {
     let mut config = SystemConfig::default();
+    let mut has_buffer_pool_size = false;
 
     if let Ok(opts) = config_term.decode::<Vec<(String, Term)>>() {
         for (key, value) in opts {
@@ -86,6 +104,7 @@ fn parse_system_config(config_term: Term) -> NifResult<SystemConfig> {
                 "buffer_pool_size" => {
                     if let Ok(size) = value.decode::<u64>() {
                         config = config.buffer_pool_size(size);
+                        has_buffer_pool_size = true;
                     }
                 }
                 "max_num_threads" => {
@@ -111,6 +130,12 @@ fn parse_system_config(config_term: Term) -> NifResult<SystemConfig> {
                 _ => {} // Ignore unknown options
             }
         }
+    }
+
+    // Set a reasonable default buffer pool size if not specified (512MB)
+    // This avoids the 8TB allocation issue
+    if !has_buffer_pool_size {
+        config = config.buffer_pool_size(512 * 1024 * 1024);
     }
 
     Ok(config)
@@ -161,58 +186,67 @@ fn value_to_term<'a>(env: Env<'a>, value: &Value) -> NifResult<Term<'a>> {
             Ok(elixir_list.encode(env))
         }
         Value::Map(_, map) => {
-            let mut elixir_map = Vec::new();
+            let mut elixir_map = HashMap::new();
             for (k, v) in map {
-                elixir_map.push((value_to_term(env, k)?, value_to_term(env, v)?));
+                // Convert key to string for proper map keys
+                let key_str = match k {
+                    Value::String(s) => s.clone(),
+                    _ => format!("{:?}", k),
+                };
+                elixir_map.insert(key_str, value_to_term(env, v)?);
             }
             Ok(elixir_map.encode(env))
         }
         Value::Struct(fields) => {
-            let mut elixir_map = Vec::new();
+            let mut elixir_map = HashMap::new();
             for (name, value) in fields {
-                elixir_map.push((name.encode(env), value_to_term(env, value)?));
+                elixir_map.insert(name.clone(), value_to_term(env, value)?);
             }
             Ok(elixir_map.encode(env))
         }
         Value::Node(node) => {
             // Convert InternalID to string
-            let id_term = node.get_node_id().to_string().encode(env);
-            let label_term = node.get_label_name().encode(env);
+            let id_str = node.get_node_id().to_string();
+            let label_str = node.get_label_name();
             let props = node.get_properties();
-            let mut prop_list = Vec::new();
+
+            // Convert properties to a HashMap
+            let mut prop_map = HashMap::new();
             for (k, v) in props {
-                prop_list.push((k.encode(env), value_to_term(env, &v)?));
+                prop_map.insert(k, value_to_term(env, &v)?);
             }
 
-            // Create a map using tuples
-            let map_entries = vec![
-                (atoms::node().encode(env), atoms::true_().encode(env)),
-                (atoms::id().encode(env), id_term),
-                (atoms::label().encode(env), label_term),
-                (atoms::properties().encode(env), prop_list.encode(env)),
-            ];
-            Ok(map_entries.encode(env))
+            // Create a HashMap for the node
+            let mut node_map = HashMap::new();
+            node_map.insert("node", atoms::true_().encode(env));
+            node_map.insert("id", id_str.encode(env));
+            node_map.insert("label", label_str.encode(env));
+            node_map.insert("properties", prop_map.encode(env));
+
+            Ok(node_map.encode(env))
         }
         Value::Rel(rel) => {
-            // RelVal might not have get_id, let's use what's available
-            let label_term = rel.get_label_name().encode(env);
+            let label_str = rel.get_label_name();
             // Convert InternalIDs to strings
-            let src_term = rel.get_src_node().to_string().encode(env);
-            let dst_term = rel.get_dst_node().to_string().encode(env);
+            let src_str = rel.get_src_node().to_string();
+            let dst_str = rel.get_dst_node().to_string();
             let props = rel.get_properties();
-            let mut prop_list = Vec::new();
+
+            // Convert properties to a HashMap
+            let mut prop_map = HashMap::new();
             for (k, v) in props {
-                prop_list.push((k.encode(env), value_to_term(env, &v)?));
+                prop_map.insert(k, value_to_term(env, &v)?);
             }
 
-            let map_entries = vec![
-                (atoms::rel().encode(env), atoms::true_().encode(env)),
-                (atoms::label().encode(env), label_term),
-                (atoms::src().encode(env), src_term),
-                (atoms::dst().encode(env), dst_term),
-                (atoms::properties().encode(env), prop_list.encode(env)),
-            ];
-            Ok(map_entries.encode(env))
+            // Create a HashMap for the relationship
+            let mut rel_map = HashMap::new();
+            rel_map.insert("rel", atoms::true_().encode(env));
+            rel_map.insert("label", label_str.encode(env));
+            rel_map.insert("src", src_str.encode(env));
+            rel_map.insert("dst", dst_str.encode(env));
+            rel_map.insert("properties", prop_map.encode(env));
+
+            Ok(rel_map.encode(env))
         }
         Value::RecursiveRel { nodes, rels } => {
             let nodes_list: Vec<Term> = nodes
@@ -230,12 +264,13 @@ fn value_to_term<'a>(env: Env<'a>, value: &Value) -> NifResult<Term<'a>> {
                 })
                 .collect::<NifResult<Vec<_>>>()?;
 
-            let map_entries = vec![
-                (atoms::recursive_rel().encode(env), atoms::true_().encode(env)),
-                (atoms::nodes().encode(env), nodes_list.encode(env)),
-                (atoms::rels().encode(env), rels_list.encode(env)),
-            ];
-            Ok(map_entries.encode(env))
+            // Create a HashMap for the recursive relationship
+            let mut rec_rel_map = HashMap::new();
+            rec_rel_map.insert("recursive_rel", atoms::true_().encode(env));
+            rec_rel_map.insert("nodes", nodes_list.encode(env));
+            rec_rel_map.insert("rels", rels_list.encode(env));
+
+            Ok(rec_rel_map.encode(env))
         }
         Value::InternalID(id) => Ok(id.to_string().encode(env)),
         Value::Decimal(d) => Ok(d.to_string().encode(env)),
@@ -246,16 +281,54 @@ fn value_to_term<'a>(env: Env<'a>, value: &Value) -> NifResult<Term<'a>> {
     }
 }
 
+// Convert query results to Elixir terms
+fn query_result_to_terms<'a>(env: Env<'a>, mut result: QueryResult) -> NifResult<Vec<Term<'a>>> {
+    let mut rows = Vec::new();
+
+    // Get column names from the result
+    let columns: Vec<String> = result.get_column_names();
+
+    // Iterate through results using next() which returns Option
+    while let Some(values) = result.next() {
+        let mut row_map = HashMap::new();
+
+        // values is likely Vec<Value> based on the API
+        let values: Vec<Value> = values;
+
+        for (i, value) in values.iter().enumerate() {
+            if i < columns.len() {
+                let column_name: &String = &columns[i];
+                let value_term = value_to_term(env, value)?;
+                row_map.insert(column_name.clone(), value_term);
+            }
+        }
+
+        // Convert HashMap to Elixir map term
+        rows.push(row_map.encode(env));
+    }
+
+    Ok(rows)
+}
+
 // NIF Functions
 
 #[rustler::nif]
 fn open_database<'a>(env: Env<'a>, path: String, config: Term<'a>) -> NifResult<Term<'a>> {
     let system_config = parse_system_config(config)?;
 
+    // Create parent directory if it doesn't exist
+    if let Some(parent) = std::path::Path::new(&path).parent() {
+        if !parent.exists() {
+            if let Err(e) = std::fs::create_dir_all(parent) {
+                return Ok((atoms::error(), format!("Failed to create directory: {}", e)).encode(env));
+            }
+        }
+    }
+
     match Database::new(&path, system_config) {
         Ok(db) => {
             let resource = ResourceArc::new(DatabaseResource {
-                db: Arc::new(Mutex::new(db)),
+                db: Arc::new(db),
             });
             Ok((atoms::ok(), resource).encode(env))
         }
@@ -270,7 +343,7 @@ fn in_memory_database<'a>(env: Env<'a>, config: Term<'a>) -> NifResult<Term<'a>>
     match Database::new(":memory:", system_config) {
         Ok(db) => {
             let resource = ResourceArc::new(DatabaseResource {
-                db: Arc::new(Mutex::new(db)),
+                db: Arc::new(db),
             });
             Ok((atoms::ok(), resource).encode(env))
         }
@@ -281,47 +354,130 @@ fn in_memory_database<'a>(env: Env<'a>, config: Term<'a>) -> NifResult<Term<'a>>
 #[rustler::nif]
 fn new_connection<'a>(
     env: Env<'a>,
-    _database: ResourceArc<DatabaseResource>,
+    database_resource: ResourceArc<DatabaseResource>,
 ) -> NifResult<Term<'a>> {
-    // This is a simplified version - in production, we'd need to handle the lifetime more carefully
-    // One approach is to store the Database in a global registry with proper lifetime management
-    Err(Error::Term(Box::new(
-        "Connection creation needs lifetime management implementation",
-    )))
+    // Get the database from the resource
+    let db_arc = Arc::clone(&database_resource.db);
+
+    // Create a leaked reference to satisfy 'static lifetime requirement
+    // This is a workaround - in production, consider using a different approach
+    let db_ptr: *const Database = Arc::as_ptr(&db_arc);
+    let db_ref: &'static Database = unsafe { &*db_ptr };
+
+    match Connection::new(db_ref) {
+        Ok(conn) => {
+            let resource = ResourceArc::new(ConnectionResource {
+                conn: Arc::new(Mutex::new(conn)),
+                _db: db_arc,
+            });
+            Ok((atoms::ok(), resource).encode(env))
+        }
+        Err(e) => Ok((atoms::error(), e.to_string()).encode(env)),
+    }
 }
 
 #[rustler::nif]
 fn query<'a>(
     env: Env<'a>,
-    _connection: ResourceArc<ConnectionResource>,
-    _query_str: String,
+    connection_resource: ResourceArc<ConnectionResource>,
+    query_str: String,
 ) -> NifResult<Term<'a>> {
-    // Simplified query implementation
-    Err(Error::Term(Box::new("Query execution not yet implemented")))
+    let conn_mutex = Arc::clone(&connection_resource.conn);
+    let conn = conn_mutex.lock();
+
+    match conn.query(&query_str) {
+        Ok(result) => {
+            match query_result_to_terms(env, result) {
+                Ok(rows) => Ok((atoms::ok(), rows).encode(env)),
+                Err(e) => Ok((atoms::error(), format!("Failed to convert results: {:?}", e)).encode(env)),
+            }
+        }
+        Err(e) => Ok((atoms::error(), e.to_string()).encode(env)),
+    }
 }
 
 #[rustler::nif]
 fn prepare<'a>(
     env: Env<'a>,
-    _connection: ResourceArc<ConnectionResource>,
-    _query_str: String,
+    connection_resource: ResourceArc<ConnectionResource>,
+    query_str: String,
 ) -> NifResult<Term<'a>> {
-    // Simplified prepare implementation
-    Err(Error::Term(Box::new("Prepare not yet implemented")))
+    let conn_mutex = Arc::clone(&connection_resource.conn);
+    let conn = conn_mutex.lock();
+
+    match conn.prepare(&query_str) {
+        Ok(stmt) => {
+            // Box and leak the PreparedStatement to get a raw pointer
+            let stmt_ptr = Box::into_raw(Box::new(stmt));
+            let resource = ResourceArc::new(PreparedStatementResource {
+                stmt: stmt_ptr,
+                _conn: Arc::clone(&conn_mutex),
+            });
+            Ok((atoms::ok(), resource).encode(env))
+        }
+        Err(e) => Ok((atoms::error(), e.to_string()).encode(env)),
+    }
 }
 
 #[rustler::nif]
 fn execute<'a>(
     env: Env<'a>,
-    _connection: ResourceArc<ConnectionResource>,
-    _prepared: ResourceArc<PreparedStatementResource>,
-    _params: Vec<(String, Term<'a>)>,
+    connection_resource: ResourceArc<ConnectionResource>,
+    prepared_resource: ResourceArc<PreparedStatementResource>,
+    params: Vec<(String, Term<'a>)>,
 ) -> NifResult<Term<'a>> {
-    // Simplified execute implementation
-    Err(Error::Term(Box::new("Execute not yet implemented")))
+    let conn_mutex = Arc::clone(&connection_resource.conn);
+    let conn = conn_mutex.lock();
+
+    // Get the PreparedStatement from raw pointer - UNSAFE
+    let stmt = unsafe { &mut *prepared_resource.stmt };
+
+    // Convert Elixir terms to RyuGraph Values with proper lifetime management
+    let params_with_values: Vec<(String, Value)> = params
+        .into_iter()
+        .map(|(name, term)| Ok((name, term_to_value(term)?)))
+        .collect::<NifResult<Vec<_>>>()?;
+
+    // Now convert to the expected format with string references
+    let param_refs: Vec<(&str, Value)> = params_with_values
+        .iter()
+        .map(|(name, value)| (name.as_str(), value.clone()))
+        .collect();
+
+    match conn.execute(stmt, param_refs) {
+        Ok(result) => {
+            match query_result_to_terms(env, result) {
+                Ok(rows) => Ok((atoms::ok(), rows).encode(env)),
+                Err(e) => Ok((atoms::error(), format!("Failed to convert results: {:?}", e)).encode(env)),
+            }
+        }
+        Err(e) => Ok((atoms::error(), e.to_string()).encode(env)),
+    }
 }
 
-// Define the NIF module
+// Helper function to convert Elixir terms to RyuGraph Values
+fn term_to_value(term: Term) -> NifResult<Value> {
+    if let Ok(i) = term.decode::<i64>() {
+        Ok(Value::Int64(i))
+    } else if let Ok(f) = term.decode::<f64>() {
+        Ok(Value::Double(f))
+    } else if let Ok(s) = term.decode::<String>() {
+        Ok(Value::String(s))
+    } else if let Ok(b) = term.decode::<bool>() {
+        Ok(Value::Bool(b))
+    } else if term.is_atom() {
+        // Check for nil
+        if term.atom_to_string().unwrap_or_default() == "nil" {
+            Ok(Value::Null(ryugraph::LogicalType::Any))
+        } else {
+            Ok(Value::String(term.atom_to_string().unwrap_or_default()))
+        }
+    } else {
+        Err(Error::BadArg)
+    }
+}
+
+// Define the NIF module with on_load
 rustler::init!(
     "Elixir.RyugraphEx.Native",
     [
@@ -331,7 +487,8 @@ rustler::init!(
         query,
         prepare,
         execute
-    ]
+    ],
+    load = on_load
 );
 
 fn on_load(env: Env, _info: Term) -> bool {

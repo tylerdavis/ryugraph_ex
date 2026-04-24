@@ -253,8 +253,9 @@ defmodule RyugraphExIntegrationTest do
       assert hd(purchased)["quantity"] == 2
 
       # Query: Calculate total sales per product
+      # Note: "Order" is a reserved word in Cypher, need to escape it
       {:ok, sales} = Connection.query(conn, """
-        MATCH (o:Order)-[c:CONTAINS]->(p:Product)
+        MATCH (o:`Order`)-[c:CONTAINS]->(p:Product)
         WHERE o.status = 'completed'
         RETURN p.name AS product, sum(c.quantity) AS units_sold, sum(c.quantity * c.unit_price) AS revenue
         ORDER BY revenue DESC;
@@ -482,7 +483,6 @@ defmodule RyugraphExIntegrationTest do
       {:ok, aggregates} = Connection.query(conn, """
         MATCH (n:Node)
         RETURN n.value AS value, count(n) AS count
-        GROUP BY n.value
         ORDER BY value;
       """)
       assert length(aggregates) == 10
