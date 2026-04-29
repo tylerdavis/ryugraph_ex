@@ -1,6 +1,11 @@
 # RyugraphEx
 
+[![GitHub](https://img.shields.io/github/stars/tylerdavis/ryugraph_ex?style=social)](https://github.com/tylerdavis/ryugraph_ex)
+[![Elixir CI](https://github.com/tylerdavis/ryugraph_ex/actions/workflows/elixir.yml/badge.svg)](https://github.com/tylerdavis/ryugraph_ex/actions)
+
 Elixir bindings for RyuGraph - a high-performance embedded property graph database with Cypher query support.
+
+**[Documentation](https://hexdocs.pm/ryugraph_ex)** | **[GitHub](https://github.com/tylerdavis/ryugraph_ex)**
 
 ## Features
 
@@ -14,7 +19,17 @@ Elixir bindings for RyuGraph - a high-performance embedded property graph databa
 
 ## Installation
 
-Add `ryugraph_ex` to your list of dependencies in `mix.exs`:
+The package can be installed from GitHub. Add `ryugraph_ex` to your list of dependencies in `mix.exs`:
+
+```elixir
+def deps do
+  [
+    {:ryugraph_ex, github: "tylerdavis/ryugraph_ex"}
+  ]
+end
+```
+
+Once available on Hex, the package can be installed with:
 
 ```elixir
 def deps do
