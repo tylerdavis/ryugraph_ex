@@ -149,7 +149,7 @@ defmodule RyugraphEx.Schema do
           [property_def()],
           keyword()
         ) :: {:ok, :created} | {:error, String.t()}
-  def create_rel_table(conn, table_name, from_table, to_table, properties \\ [], opts \\ []) do
+  def create_rel_table(conn, table_name, from_table, to_table, properties \\ [], _opts \\ []) do
     # For relationship tables, we need different property handling - no PRIMARY KEY
     props_str =
       if properties == [] do
@@ -313,7 +313,7 @@ defmodule RyugraphEx.Schema do
   end
 
   # Helper to find relationship tables that depend on a node table
-  defp get_dependent_rel_tables(conn, node_table) do
+  defp get_dependent_rel_tables(conn, _node_table) do
     # Use CALL show_tables() to get all tables
     case Connection.query(conn, "CALL show_tables() RETURN *;") do
       {:ok, results} ->
@@ -326,7 +326,7 @@ defmodule RyugraphEx.Schema do
         dependent_tables = Enum.filter(rel_tables, fn rel_table ->
           # Query table_info to check if it references our node table
           case Connection.query(conn, "CALL table_info('#{rel_table}') RETURN *;") do
-            {:ok, info} ->
+            {:ok, _info} ->
               # Check if src or dst reference our table (this is a heuristic)
               # In reality, RyuGraph doesn't expose this directly
               true

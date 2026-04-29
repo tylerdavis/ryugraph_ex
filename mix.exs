@@ -14,6 +14,21 @@ defmodule RyugraphEx.MixProject do
           path: "native/ryugraph_nif",
           mode: rustc_mode(Mix.env())
         ]
+      ],
+
+      # Documentation
+      name: "RyugraphEx",
+      source_url: "https://github.com/tylerdavis/ryugraph_ex",
+      homepage_url: "https://github.com/tylerdavis/ryugraph_ex",
+      docs: [
+        main: "RyugraphEx",
+        extras: ["README.md"],
+        groups_for_modules: [
+          "Core": [RyugraphEx, RyugraphEx.Database, RyugraphEx.Connection],
+          "Graph Operations": [RyugraphEx.Graph],
+          "Schema Management": [RyugraphEx.Schema],
+          "Internal": [RyugraphEx.Native]
+        ]
       ]
     ]
   end
@@ -28,7 +43,8 @@ defmodule RyugraphEx.MixProject do
   # Run "mix help deps" to learn about dependencies.
   defp deps do
     [
-      {:rustler, "~> 0.35.0", runtime: false}
+      {:rustler, "~> 0.35.0", runtime: false},
+      {:ex_doc, "~> 0.34.0", only: :dev, runtime: false}
     ]
   end
 

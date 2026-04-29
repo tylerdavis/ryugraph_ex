@@ -122,16 +122,6 @@ defmodule RyugraphEx.Graph do
   defp extract_user_id(id) when is_integer(id), do: id
   defp extract_user_id(id), do: id
 
-  defp extract_offset(id) when is_binary(id) do
-    if String.contains?(id, ":") do
-      [_, offset] = String.split(id, ":")
-      offset
-    else
-      "0"
-    end
-  end
-  defp extract_offset(id) when is_integer(id), do: "0"
-  defp extract_offset(_), do: "0"
 
   @doc """
   Creates a relationship between two nodes, raising on error.
@@ -618,24 +608,6 @@ defmodule RyugraphEx.Graph do
   end
 
   # Helper to format node IDs for use in Cypher queries
-  # RyuGraph internal IDs come as strings like "0:0" and need to be wrapped in parentheses
-  defp format_node_id(id) when is_binary(id) do
-    # Check if it looks like an internal ID format (contains colon)
-    if String.contains?(id, ":") do
-      # Wrap in parentheses if not already wrapped
-      if String.starts_with?(id, "(") and String.ends_with?(id, ")") do
-        id
-      else
-        "(#{id})"
-      end
-    else
-      # Regular numeric ID
-      id
-    end
-  end
-  defp format_node_id(id) when is_integer(id), do: Integer.to_string(id)
-  defp format_node_id(id), do: "#{id}"
-
   # Format path to have nodes and rels arrays
   defp format_path(path) when is_map(path) do
     nodes = Map.get(path, "nodes", []) |> Enum.map(&atomize_keys/1)

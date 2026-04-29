@@ -502,7 +502,7 @@ defmodule RyugraphEx.GraphTest do
 
     test "handles depth parameter for multi-hop neighbors", %{conn: conn, center: center} do
       # Create second-degree connections
-      {:ok, second_degree} = Graph.create_node(conn, "Person",
+      {:ok, _second_degree} = Graph.create_node(conn, "Person",
         id: 10,
         name: "SecondDegree"
       )

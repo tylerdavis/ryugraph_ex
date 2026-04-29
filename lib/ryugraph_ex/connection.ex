@@ -86,7 +86,7 @@ defmodule RyugraphEx.Connection do
 
   """
   @spec query(t(), String.t(), keyword()) :: {:ok, list(map())} | {:error, String.t()}
-  def query(connection, query, opts \\ []) when is_binary(query) do
+  def query(connection, query, _opts \\ []) when is_binary(query) do
     Native.query(connection, query)
   end
 
@@ -241,7 +241,7 @@ defmodule RyugraphEx.Connection do
   def transaction(connection, fun) when is_function(fun, 1) do
     with {:ok, _} <- query(connection, "BEGIN TRANSACTION;") do
       case fun.(connection) do
-        {:ok, result} = success ->
+        {:ok, _result} = success ->
           case query(connection, "COMMIT;") do
             {:ok, _} -> success
             error -> error
@@ -280,7 +280,7 @@ defmodule RyugraphEx.Connection do
 
   """
   @spec set_max_threads(t(), pos_integer()) :: :ok | {:error, String.t()}
-  def set_max_threads(connection, num_threads) when is_integer(num_threads) and num_threads > 0 do
+  def set_max_threads(_connection, num_threads) when is_integer(num_threads) and num_threads > 0 do
     # This would be implemented in the NIF
     {:error, "Not yet implemented"}
   end
@@ -301,7 +301,7 @@ defmodule RyugraphEx.Connection do
 
   """
   @spec interrupt(t()) :: :ok | {:error, String.t()}
-  def interrupt(connection) do
+  def interrupt(_connection) do
     # This would be implemented in the NIF
     {:error, "Not yet implemented"}
   end
@@ -321,7 +321,7 @@ defmodule RyugraphEx.Connection do
 
   """
   @spec set_query_timeout(t(), non_neg_integer()) :: :ok | {:error, String.t()}
-  def set_query_timeout(connection, timeout_ms)
+  def set_query_timeout(_connection, timeout_ms)
       when is_integer(timeout_ms) and timeout_ms >= 0 do
     # This would be implemented in the NIF
     {:error, "Not yet implemented"}
