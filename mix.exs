@@ -16,13 +16,17 @@ defmodule RyugraphEx.MixProject do
         ]
       ],
 
+      # Hex.pm package metadata
+      description: "Elixir NIF bindings for RyuGraph - an embedded property graph database with Cypher query support",
+      package: package(),
+
       # Documentation
       name: "RyugraphEx",
       source_url: "https://github.com/tylerdavis/ryugraph_ex",
       homepage_url: "https://github.com/tylerdavis/ryugraph_ex",
       docs: [
         main: "RyugraphEx",
-        extras: ["README.md"],
+        extras: ["README.md", "CHANGELOG.md"],
         groups_for_modules: [
           "Core": [RyugraphEx, RyugraphEx.Database, RyugraphEx.Connection],
           "Graph Operations": [RyugraphEx.Graph],
@@ -50,4 +54,28 @@ defmodule RyugraphEx.MixProject do
 
   defp rustc_mode(:prod), do: :release
   defp rustc_mode(_), do: :debug
+
+  defp package do
+    [
+      name: "ryugraph_ex",
+      licenses: ["MIT"],
+      links: %{
+        "GitHub" => "https://github.com/tylerdavis/ryugraph_ex",
+        "RyuGraph" => "https://github.com/predictable-labs/ryugraph",
+        "RyuGraph Website" => "https://www.ryugraph.io"
+      },
+      files: ~w(
+        lib
+        native/ryugraph_nif/src
+        native/ryugraph_nif/Cargo.toml
+        native/ryugraph_nif/Cargo.lock
+        mix.exs
+        README.md
+        CHANGELOG.md
+        LICENSE
+        .formatter.exs
+      ),
+      maintainers: ["Tyler Davis"]
+    ]
+  end
 end

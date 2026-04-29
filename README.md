@@ -3,7 +3,9 @@
 [![GitHub](https://img.shields.io/github/stars/tylerdavis/ryugraph_ex?style=social)](https://github.com/tylerdavis/ryugraph_ex)
 [![Elixir CI](https://github.com/tylerdavis/ryugraph_ex/actions/workflows/elixir.yml/badge.svg)](https://github.com/tylerdavis/ryugraph_ex/actions)
 
-Elixir bindings for RyuGraph - a high-performance embedded property graph database with Cypher query support.
+Elixir bindings for RyuGraph - a high-performance embedded property graph database with Cypher query support. A great option for building fast, low-ops agentic systems.
+
+> A note on AI slop. This project was generated using Claude Code, with some careful babysitting. It is fully tested both with unit testing and manual QA, so we should be in good shape. With all of that said, this is a new project that will likely have areas that need improvement.
 
 **[Documentation](https://hexdocs.pm/ryugraph_ex)** | **[GitHub](https://github.com/tylerdavis/ryugraph_ex)**
 
