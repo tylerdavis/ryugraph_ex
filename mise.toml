@@ -1,7 +1,7 @@
 [tools]
 rust = "latest"
-erlang = "latest"
-elixir = "latest"
+erlang = "28.0"
+elixir = "1.19.5"
 
 [env]
 # Optional: Set environment variables if needed
