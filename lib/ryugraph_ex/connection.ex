@@ -280,7 +280,8 @@ defmodule RyugraphEx.Connection do
 
   """
   @spec set_max_threads(t(), pos_integer()) :: :ok | {:error, String.t()}
-  def set_max_threads(_connection, num_threads) when is_integer(num_threads) and num_threads > 0 do
+  def set_max_threads(_connection, num_threads)
+      when is_integer(num_threads) and num_threads > 0 do
     # This would be implemented in the NIF
     {:error, "Not yet implemented"}
   end

@@ -61,20 +61,22 @@ defmodule RyugraphEx.ConnectionTest do
     end
 
     test "executes DDL statements", %{conn: conn} do
-      assert {:ok, _result} = Connection.query(conn, """
-        CREATE NODE TABLE Product(
-          id INT64,
-          name STRING,
-          price DOUBLE,
-          PRIMARY KEY(id)
-        );
-      """)
+      assert {:ok, _result} =
+               Connection.query(conn, """
+                 CREATE NODE TABLE Product(
+                   id INT64,
+                   name STRING,
+                   price DOUBLE,
+                   PRIMARY KEY(id)
+                 );
+               """)
     end
 
     test "executes CREATE statements", %{conn: conn} do
-      assert {:ok, _result} = Connection.query(conn, """
-        CREATE (:Person {id: 1, name: 'Alice', age: 30});
-      """)
+      assert {:ok, _result} =
+               Connection.query(conn, """
+                 CREATE (:Person {id: 1, name: 'Alice', age: 30});
+               """)
     end
 
     test "executes MATCH queries", %{conn: conn} do
@@ -82,24 +84,26 @@ defmodule RyugraphEx.ConnectionTest do
       Connection.query!(conn, "CREATE (:Person {id: 1, name: 'Alice', age: 30});")
       Connection.query!(conn, "CREATE (:Person {id: 2, name: 'Bob', age: 25});")
 
-      assert {:ok, results} = Connection.query(conn, """
-        MATCH (p:Person)
-        RETURN p.name AS name, p.age AS age
-        ORDER BY p.id;
-      """)
+      assert {:ok, results} =
+               Connection.query(conn, """
+                 MATCH (p:Person)
+                 RETURN p.name AS name, p.age AS age
+                 ORDER BY p.id;
+               """)
 
       assert results == [
-        %{"name" => "Alice", "age" => 30},
-        %{"name" => "Bob", "age" => 25}
-      ]
+               %{"name" => "Alice", "age" => 30},
+               %{"name" => "Bob", "age" => 25}
+             ]
     end
 
     test "handles empty result sets", %{conn: conn} do
-      assert {:ok, results} = Connection.query(conn, """
-        MATCH (p:Person)
-        WHERE p.age > 100
-        RETURN p;
-      """)
+      assert {:ok, results} =
+               Connection.query(conn, """
+                 MATCH (p:Person)
+                 WHERE p.age > 100
+                 RETURN p;
+               """)
 
       assert results == []
     end
@@ -108,11 +112,12 @@ defmodule RyugraphEx.ConnectionTest do
       Connection.query!(conn, "CREATE (:Person {id: 1, name: 'Alice', age: 30});")
       Connection.query!(conn, "CREATE (:Person {id: 2, name: 'Bob', age: 25});")
 
-      assert {:ok, results} = Connection.query(conn, """
-        MATCH (p:Person)
-        WHERE p.age >= 30
-        RETURN p.name AS name;
-      """)
+      assert {:ok, results} =
+               Connection.query(conn, """
+                 MATCH (p:Person)
+                 WHERE p.age >= 30
+                 RETURN p.name AS name;
+               """)
 
       assert results == [%{"name" => "Alice"}]
     end
@@ -122,30 +127,35 @@ defmodule RyugraphEx.ConnectionTest do
       Connection.query!(conn, "CREATE (:Person {id: 2, name: 'Bob', age: 25});")
       Connection.query!(conn, "CREATE (:Person {id: 3, name: 'Charlie', age: 35});")
 
-      assert {:ok, results} = Connection.query(conn, """
-        MATCH (p:Person)
-        RETURN p.name AS name
-        ORDER BY p.age DESC;
-      """)
+      assert {:ok, results} =
+               Connection.query(conn, """
+                 MATCH (p:Person)
+                 RETURN p.name AS name
+                 ORDER BY p.age DESC;
+               """)
 
       assert results == [
-        %{"name" => "Charlie"},
-        %{"name" => "Alice"},
-        %{"name" => "Bob"}
-      ]
+               %{"name" => "Charlie"},
+               %{"name" => "Alice"},
+               %{"name" => "Bob"}
+             ]
     end
 
     test "supports LIMIT", %{conn: conn} do
       for i <- 1..5 do
-        Connection.query!(conn, "CREATE (:Person {id: #{i}, name: 'Person#{i}', age: #{20 + i}});")
+        Connection.query!(
+          conn,
+          "CREATE (:Person {id: #{i}, name: 'Person#{i}', age: #{20 + i}});"
+        )
       end
 
-      assert {:ok, results} = Connection.query(conn, """
-        MATCH (p:Person)
-        RETURN p.id AS id
-        ORDER BY p.id
-        LIMIT 3;
-      """)
+      assert {:ok, results} =
+               Connection.query(conn, """
+                 MATCH (p:Person)
+                 RETURN p.id AS id
+                 ORDER BY p.id
+                 LIMIT 3;
+               """)
 
       assert length(results) == 3
     end
@@ -158,10 +168,11 @@ defmodule RyugraphEx.ConnectionTest do
 
     test "handles runtime errors", %{conn: conn} do
       # Query non-existent table
-      assert {:error, _reason} = Connection.query(conn, """
-        MATCH (n:NonExistentTable)
-        RETURN n;
-      """)
+      assert {:error, _reason} =
+               Connection.query(conn, """
+                 MATCH (n:NonExistentTable)
+                 RETURN n;
+               """)
     end
   end
 
@@ -201,47 +212,55 @@ defmodule RyugraphEx.ConnectionTest do
     end
 
     test "prepares statement with parameters", %{conn: conn} do
-      assert {:ok, prepared} = Connection.prepare(conn, """
-        CREATE (:Person {id: $id, name: $name, age: $age});
-      """)
+      assert {:ok, prepared} =
+               Connection.prepare(conn, """
+                 CREATE (:Person {id: $id, name: $name, age: $age});
+               """)
+
       assert is_reference(prepared)
     end
 
     test "executes prepared statement with keyword list", %{conn: conn} do
-      {:ok, prepared} = Connection.prepare(conn, """
-        CREATE (:Person {id: $id, name: $name, age: $age});
-      """)
+      {:ok, prepared} =
+        Connection.prepare(conn, """
+          CREATE (:Person {id: $id, name: $name, age: $age});
+        """)
 
-      assert {:ok, _result} = Connection.execute(conn, prepared,
-        id: 1,
-        name: "Alice",
-        age: 30
-      )
+      assert {:ok, _result} =
+               Connection.execute(conn, prepared,
+                 id: 1,
+                 name: "Alice",
+                 age: 30
+               )
     end
 
     test "executes prepared statement with map", %{conn: conn} do
-      {:ok, prepared} = Connection.prepare(conn, """
-        CREATE (:Person {id: $id, name: $name, age: $age});
-      """)
+      {:ok, prepared} =
+        Connection.prepare(conn, """
+          CREATE (:Person {id: $id, name: $name, age: $age});
+        """)
 
-      assert {:ok, _result} = Connection.execute(conn, prepared, %{
-        id: 2,
-        name: "Bob",
-        age: 25
-      })
+      assert {:ok, _result} =
+               Connection.execute(conn, prepared, %{
+                 id: 2,
+                 name: "Bob",
+                 age: 25
+               })
     end
 
     test "executes same prepared statement multiple times", %{conn: conn} do
-      {:ok, prepared} = Connection.prepare(conn, """
-        CREATE (:Person {id: $id, name: $name, age: $age});
-      """)
+      {:ok, prepared} =
+        Connection.prepare(conn, """
+          CREATE (:Person {id: $id, name: $name, age: $age});
+        """)
 
       for i <- 1..3 do
-        assert {:ok, _} = Connection.execute(conn, prepared,
-          id: i,
-          name: "Person#{i}",
-          age: 20 + i
-        )
+        assert {:ok, _} =
+                 Connection.execute(conn, prepared,
+                   id: i,
+                   name: "Person#{i}",
+                   age: 20 + i
+                 )
       end
 
       {:ok, results} = Connection.query(conn, "MATCH (p:Person) RETURN count(p) AS count;")
@@ -251,42 +270,51 @@ defmodule RyugraphEx.ConnectionTest do
     test "prepared SELECT queries", %{conn: conn} do
       # Insert test data
       for i <- 1..5 do
-        Connection.query!(conn, "CREATE (:Person {id: #{i}, name: 'Person#{i}', age: #{20 + i * 5}});")
+        Connection.query!(
+          conn,
+          "CREATE (:Person {id: #{i}, name: 'Person#{i}', age: #{20 + i * 5}});"
+        )
       end
 
-      {:ok, prepared} = Connection.prepare(conn, """
-        MATCH (p:Person)
-        WHERE p.age >= $min_age
-        RETURN p.name AS name, p.age AS age
-        ORDER BY p.age;
-      """)
+      {:ok, prepared} =
+        Connection.prepare(conn, """
+          MATCH (p:Person)
+          WHERE p.age >= $min_age
+          RETURN p.name AS name, p.age AS age
+          ORDER BY p.age;
+        """)
 
       assert {:ok, results} = Connection.execute(conn, prepared, min_age: 35)
       assert length(results) == 3
     end
 
     test "handles missing parameters", %{conn: conn} do
-      {:ok, prepared} = Connection.prepare(conn, """
-        CREATE (:Person {id: $id, name: $name, age: $age});
-      """)
+      {:ok, prepared} =
+        Connection.prepare(conn, """
+          CREATE (:Person {id: $id, name: $name, age: $age});
+        """)
 
-      assert {:error, _reason} = Connection.execute(conn, prepared,
-        id: 1,
-        name: "Alice"
-        # missing age parameter
-      )
+      assert {:error, _reason} =
+               Connection.execute(conn, prepared,
+                 id: 1,
+                 name: "Alice"
+                 # missing age parameter
+               )
     end
 
     test "handles type mismatches", %{conn: conn} do
-      {:ok, prepared} = Connection.prepare(conn, """
-        CREATE (:Person {id: $id, name: $name, age: $age});
-      """)
+      {:ok, prepared} =
+        Connection.prepare(conn, """
+          CREATE (:Person {id: $id, name: $name, age: $age});
+        """)
 
-      assert {:error, _reason} = Connection.execute(conn, prepared,
-        id: "not_a_number",  # Should be INT64
-        name: "Alice",
-        age: 30
-      )
+      assert {:error, _reason} =
+               Connection.execute(conn, prepared,
+                 # Should be INT64
+                 id: "not_a_number",
+                 name: "Alice",
+                 age: 30
+               )
     end
   end
 
@@ -343,48 +371,64 @@ defmodule RyugraphEx.ConnectionTest do
     end
 
     test "commits successful transactions", %{conn: conn} do
-      result = Connection.transaction(conn, fn conn ->
-        {:ok, _} = Connection.query(conn, """
-          MATCH (a:Account {id: 1})
-          SET a.balance = a.balance - 100;
-        """)
+      result =
+        Connection.transaction(conn, fn conn ->
+          {:ok, _} =
+            Connection.query(conn, """
+              MATCH (a:Account {id: 1})
+              SET a.balance = a.balance - 100;
+            """)
 
-        {:ok, _} = Connection.query(conn, """
-          MATCH (a:Account {id: 2})
-          SET a.balance = a.balance + 100;
-        """)
+          {:ok, _} =
+            Connection.query(conn, """
+              MATCH (a:Account {id: 2})
+              SET a.balance = a.balance + 100;
+            """)
 
-        {:ok, :transferred}
-      end)
+          {:ok, :transferred}
+        end)
 
       assert result == {:ok, :transferred}
 
       # Verify the changes persisted
-      {:ok, [%{"balance" => balance1}]} = Connection.query(conn,
-        "MATCH (a:Account {id: 1}) RETURN a.balance AS balance;")
-      {:ok, [%{"balance" => balance2}]} = Connection.query(conn,
-        "MATCH (a:Account {id: 2}) RETURN a.balance AS balance;")
+      {:ok, [%{"balance" => balance1}]} =
+        Connection.query(
+          conn,
+          "MATCH (a:Account {id: 1}) RETURN a.balance AS balance;"
+        )
+
+      {:ok, [%{"balance" => balance2}]} =
+        Connection.query(
+          conn,
+          "MATCH (a:Account {id: 2}) RETURN a.balance AS balance;"
+        )
 
       assert balance1 == 900
       assert balance2 == 600
     end
 
     test "rolls back failed transactions", %{conn: conn} do
-      result = Connection.transaction(conn, fn conn ->
-        {:ok, _} = Connection.query(conn, """
-          MATCH (a:Account {id: 1})
-          SET a.balance = a.balance - 100;
-        """)
+      result =
+        Connection.transaction(conn, fn conn ->
+          {:ok, _} =
+            Connection.query(conn, """
+              MATCH (a:Account {id: 1})
+              SET a.balance = a.balance - 100;
+            """)
 
-        # Simulate failure
-        {:error, "Insufficient funds"}
-      end)
+          # Simulate failure
+          {:error, "Insufficient funds"}
+        end)
 
       assert result == {:error, "Insufficient funds"}
 
       # Verify no changes were made
-      {:ok, [%{"balance" => balance}]} = Connection.query(conn,
-        "MATCH (a:Account {id: 1}) RETURN a.balance AS balance;")
+      {:ok, [%{"balance" => balance}]} =
+        Connection.query(
+          conn,
+          "MATCH (a:Account {id: 1}) RETURN a.balance AS balance;"
+        )
+
       assert balance == 1000
     end
 
@@ -401,28 +445,40 @@ defmodule RyugraphEx.ConnectionTest do
       end
 
       # Verify rollback
-      {:ok, [%{"balance" => balance}]} = Connection.query(conn,
-        "MATCH (a:Account {id: 1}) RETURN a.balance AS balance;")
+      {:ok, [%{"balance" => balance}]} =
+        Connection.query(
+          conn,
+          "MATCH (a:Account {id: 1}) RETURN a.balance AS balance;"
+        )
+
       assert balance == 1000
     end
 
     test "handles nested data correctly", %{conn: conn} do
-      result = Connection.transaction(conn, fn conn ->
-        with {:ok, _} <- Connection.query(conn,
-               "CREATE (:Account {id: 3, balance: 750});"),
-             {:ok, accounts} <- Connection.query(conn,
-               "MATCH (a:Account) RETURN count(a) AS count;") do
-          {:ok, accounts}
-        end
-      end)
+      result =
+        Connection.transaction(conn, fn conn ->
+          with {:ok, _} <-
+                 Connection.query(
+                   conn,
+                   "CREATE (:Account {id: 3, balance: 750});"
+                 ),
+               {:ok, accounts} <-
+                 Connection.query(
+                   conn,
+                   "MATCH (a:Account) RETURN count(a) AS count;"
+                 ) do
+            {:ok, accounts}
+          end
+        end)
 
       assert {:ok, [%{"count" => 3}]} = result
     end
 
     test "handles invalid return values", %{conn: conn} do
-      result = Connection.transaction(conn, fn _conn ->
-        :invalid_return
-      end)
+      result =
+        Connection.transaction(conn, fn _conn ->
+          :invalid_return
+        end)
 
       assert {:error, {:invalid_transaction_result, :invalid_return}} = result
     end
@@ -457,7 +513,8 @@ defmodule RyugraphEx.ConnectionTest do
     end
 
     test "timeout actually works", %{conn: conn} do
-      Connection.set_query_timeout(conn, 100)  # 100ms timeout
+      # 100ms timeout
+      Connection.set_query_timeout(conn, 100)
 
       # This would need a slow query to test properly
       # assert {:error, _timeout} = Connection.query(conn, slow_query)
@@ -483,11 +540,12 @@ defmodule RyugraphEx.ConnectionTest do
     test "multiple connections can read concurrently", %{db: db} do
       connections = for _ <- 1..5, do: elem(Connection.new(db), 1)
 
-      tasks = for conn <- connections do
-        Task.async(fn ->
-          Connection.query(conn, "MATCH (c:Counter) RETURN c.value AS value;")
-        end)
-      end
+      tasks =
+        for conn <- connections do
+          Task.async(fn ->
+            Connection.query(conn, "MATCH (c:Counter) RETURN c.value AS value;")
+          end)
+        end
 
       results = Task.await_many(tasks)
 
@@ -500,18 +558,20 @@ defmodule RyugraphEx.ConnectionTest do
       # Note: This behavior depends on RyuGraph's concurrency model
       connections = for _ <- 1..3, do: elem(Connection.new(db), 1)
 
-      tasks = for {conn, i} <- Enum.with_index(connections) do
-        Task.async(fn ->
-          Connection.transaction(conn, fn conn ->
-            # Each connection tries to increment the counter
-            Connection.query(conn, """
-              MATCH (c:Counter {id: 1})
-              SET c.value = c.value + 1;
-            """)
-            {:ok, i}
+      tasks =
+        for {conn, i} <- Enum.with_index(connections) do
+          Task.async(fn ->
+            Connection.transaction(conn, fn conn ->
+              # Each connection tries to increment the counter
+              Connection.query(conn, """
+                MATCH (c:Counter {id: 1})
+                SET c.value = c.value + 1;
+              """)
+
+              {:ok, i}
+            end)
           end)
-        end)
-      end
+        end
 
       results = Task.await_many(tasks, 10_000)
 
@@ -522,8 +582,13 @@ defmodule RyugraphEx.ConnectionTest do
 
       # Final value should be 3
       {:ok, conn} = Connection.new(db)
-      {:ok, [%{"value" => value}]} = Connection.query(conn,
-        "MATCH (c:Counter {id: 1}) RETURN c.value AS value;")
+
+      {:ok, [%{"value" => value}]} =
+        Connection.query(
+          conn,
+          "MATCH (c:Counter {id: 1}) RETURN c.value AS value;"
+        )
+
       assert value == 3
     end
   end

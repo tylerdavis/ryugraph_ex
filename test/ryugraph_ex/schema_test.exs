@@ -10,91 +10,106 @@ defmodule RyugraphEx.SchemaTest do
 
   describe "create_node_table/4" do
     test "creates simple node table", %{conn: conn} do
-      assert {:ok, :created} = Schema.create_node_table(conn, "Person", [
-        {:id, :int64},
-        {:name, :string}
-      ])
+      assert {:ok, :created} =
+               Schema.create_node_table(conn, "Person", [
+                 {:id, :int64},
+                 {:name, :string}
+               ])
     end
 
     test "creates node table with primary key", %{conn: conn} do
-      assert {:ok, :created} = Schema.create_node_table(conn, "Person", [
-        {:id, :int64},
-        {:name, :string},
-        {:email, :string}
-      ], primary_key: [:id])
+      assert {:ok, :created} =
+               Schema.create_node_table(
+                 conn,
+                 "Person",
+                 [
+                   {:id, :int64},
+                   {:name, :string},
+                   {:email, :string}
+                 ], primary_key: [:id])
     end
 
     test "creates node table with inline primary key", %{conn: conn} do
-      assert {:ok, :created} = Schema.create_node_table(conn, "Person", [
-        {:id, :int64, primary_key: true},
-        {:name, :string},
-        {:age, :int64}
-      ])
+      assert {:ok, :created} =
+               Schema.create_node_table(conn, "Person", [
+                 {:id, :int64, primary_key: true},
+                 {:name, :string},
+                 {:age, :int64}
+               ])
     end
 
     test "creates node table with composite primary key", %{conn: conn} do
-      assert {:ok, :created} = Schema.create_node_table(conn, "UserSession", [
-        {:user_id, :int64},
-        {:session_id, :string},
-        {:created_at, :timestamp}
-      ], primary_key: [:user_id, :session_id])
+      assert {:ok, :created} =
+               Schema.create_node_table(
+                 conn,
+                 "UserSession",
+                 [
+                   {:user_id, :int64},
+                   {:session_id, :string},
+                   {:created_at, :timestamp}
+                 ], primary_key: [:user_id, :session_id])
     end
 
     test "supports all basic data types", %{conn: conn} do
-      assert {:ok, :created} = Schema.create_node_table(conn, "AllTypes", [
-        {:id, :int64, primary_key: true},
-        {:small_int, :int8},
-        {:medium_int, :int16},
-        {:regular_int, :int32},
-        {:big_int, :int64},
-        {:huge_int, :int128},
-        {:unsigned_small, :uint8},
-        {:unsigned_medium, :uint16},
-        {:unsigned_regular, :uint32},
-        {:unsigned_big, :uint64},
-        {:float_val, :float},
-        {:double_val, :double},
-        {:bool_val, :bool},
-        {:text, :string},
-        {:binary_data, :blob},
-        {:unique_id, :uuid},
-        {:decimal_val, :decimal}
-      ])
+      assert {:ok, :created} =
+               Schema.create_node_table(conn, "AllTypes", [
+                 {:id, :int64, primary_key: true},
+                 {:small_int, :int8},
+                 {:medium_int, :int16},
+                 {:regular_int, :int32},
+                 {:big_int, :int64},
+                 {:huge_int, :int128},
+                 {:unsigned_small, :uint8},
+                 {:unsigned_medium, :uint16},
+                 {:unsigned_regular, :uint32},
+                 {:unsigned_big, :uint64},
+                 {:float_val, :float},
+                 {:double_val, :double},
+                 {:bool_val, :bool},
+                 {:text, :string},
+                 {:binary_data, :blob},
+                 {:unique_id, :uuid},
+                 {:decimal_val, :decimal}
+               ])
     end
 
     test "supports temporal data types", %{conn: conn} do
-      assert {:ok, :created} = Schema.create_node_table(conn, "TimeData", [
-        {:id, :int64, primary_key: true},
-        {:birth_date, :date},
-        {:created_at, :timestamp},
-        {:updated_at, :timestamp_tz},
-        {:nano_time, :timestamp_ns},
-        {:milli_time, :timestamp_ms},
-        {:sec_time, :timestamp_sec},
-        {:duration, :interval}
-      ])
+      assert {:ok, :created} =
+               Schema.create_node_table(conn, "TimeData", [
+                 {:id, :int64, primary_key: true},
+                 {:birth_date, :date},
+                 {:created_at, :timestamp},
+                 {:updated_at, :timestamp_tz},
+                 {:nano_time, :timestamp_ns},
+                 {:milli_time, :timestamp_ms},
+                 {:sec_time, :timestamp_sec},
+                 {:duration, :interval}
+               ])
     end
 
     test "supports collection types", %{conn: conn} do
-      assert {:ok, :created} = Schema.create_node_table(conn, "Collections", [
-        {:id, :int64, primary_key: true},
-        {:tags, {:list, :string}},
-        {:scores, {:array, :double}},
-        {:metadata, {:map, :string, :string}}
-      ])
+      assert {:ok, :created} =
+               Schema.create_node_table(conn, "Collections", [
+                 {:id, :int64, primary_key: true},
+                 {:tags, {:list, :string}},
+                 {:scores, {:array, :double}},
+                 {:metadata, {:map, :string, :string}}
+               ])
     end
 
     test "handles table names with underscores", %{conn: conn} do
-      assert {:ok, :created} = Schema.create_node_table(conn, "user_profile", [
-        {:id, :int64, primary_key: true},
-        {:user_name, :string}
-      ])
+      assert {:ok, :created} =
+               Schema.create_node_table(conn, "user_profile", [
+                 {:id, :int64, primary_key: true},
+                 {:user_name, :string}
+               ])
     end
 
     test "handles table names with numbers", %{conn: conn} do
-      assert {:ok, :created} = Schema.create_node_table(conn, "Table123", [
-        {:id, :int64, primary_key: true}
-      ])
+      assert {:ok, :created} =
+               Schema.create_node_table(conn, "Table123", [
+                 {:id, :int64, primary_key: true}
+               ])
     end
 
     test "fails on duplicate table name", %{conn: conn} do
@@ -102,9 +117,10 @@ defmodule RyugraphEx.SchemaTest do
         {:id, :int64, primary_key: true}
       ])
 
-      assert {:error, _reason} = Schema.create_node_table(conn, "Person", [
-        {:id, :int64, primary_key: true}
-      ])
+      assert {:error, _reason} =
+               Schema.create_node_table(conn, "Person", [
+                 {:id, :int64, primary_key: true}
+               ])
     end
 
     test "fails without properties", %{conn: conn} do
@@ -114,10 +130,12 @@ defmodule RyugraphEx.SchemaTest do
     end
 
     test "creates table with boolean type using alternate name", %{conn: conn} do
-      assert {:ok, :created} = Schema.create_node_table(conn, "Flags", [
-        {:id, :int64, primary_key: true},
-        {:is_active, :boolean}  # Should map to :bool
-      ])
+      assert {:ok, :created} =
+               Schema.create_node_table(conn, "Flags", [
+                 {:id, :int64, primary_key: true},
+                 # Should map to :bool
+                 {:is_active, :boolean}
+               ])
     end
   end
 
@@ -143,80 +161,69 @@ defmodule RyugraphEx.SchemaTest do
     end
 
     test "creates simple relationship table", %{conn: conn} do
-      assert {:ok, :created} = Schema.create_rel_table(conn, "KNOWS",
-        "Person", "Person"
-      )
+      assert {:ok, :created} = Schema.create_rel_table(conn, "KNOWS", "Person", "Person")
     end
 
     test "creates relationship table with properties", %{conn: conn} do
-      assert {:ok, :created} = Schema.create_rel_table(conn, "WORKS_FOR",
-        "Person", "Company", [
-          {:since, :date},
-          {:position, :string},
-          {:salary, :double}
-        ]
-      )
+      assert {:ok, :created} =
+               Schema.create_rel_table(conn, "WORKS_FOR", "Person", "Company", [
+                 {:since, :date},
+                 {:position, :string},
+                 {:salary, :double}
+               ])
     end
 
     test "creates many-to-many relationship", %{conn: conn} do
-      assert {:ok, :created} = Schema.create_rel_table(conn, "ASSIGNED_TO",
-        "Person", "Project", [],
-        multiplicity: :many_to_many
-      )
+      assert {:ok, :created} =
+               Schema.create_rel_table(conn, "ASSIGNED_TO", "Person", "Project", [],
+                 multiplicity: :many_to_many
+               )
     end
 
     test "creates one-to-many relationship", %{conn: conn} do
-      assert {:ok, :created} = Schema.create_rel_table(conn, "MANAGES",
-        "Person", "Project", [],
-        multiplicity: :one_to_many
-      )
+      assert {:ok, :created} =
+               Schema.create_rel_table(conn, "MANAGES", "Person", "Project", [],
+                 multiplicity: :one_to_many
+               )
     end
 
     test "creates one-to-one relationship", %{conn: conn} do
-      assert {:ok, :created} = Schema.create_rel_table(conn, "LEADS",
-        "Person", "Project", [],
-        multiplicity: :one_to_one
-      )
+      assert {:ok, :created} =
+               Schema.create_rel_table(conn, "LEADS", "Person", "Project", [],
+                 multiplicity: :one_to_one
+               )
     end
 
     test "creates self-referential relationship", %{conn: conn} do
-      assert {:ok, :created} = Schema.create_rel_table(conn, "REPORTS_TO",
-        "Person", "Person", [
-          {:since, :date}
-        ]
-      )
+      assert {:ok, :created} =
+               Schema.create_rel_table(conn, "REPORTS_TO", "Person", "Person", [
+                 {:since, :date}
+               ])
     end
 
     test "handles relationship with all property types", %{conn: conn} do
-      assert {:ok, :created} = Schema.create_rel_table(conn, "COMPLEX_REL",
-        "Person", "Company", [
-          {:weight, :double},
-          {:priority, :int32},
-          {:active, :bool},
-          {:notes, :string},
-          {:tags, {:list, :string}}
-        ]
-      )
+      assert {:ok, :created} =
+               Schema.create_rel_table(conn, "COMPLEX_REL", "Person", "Company", [
+                 {:weight, :double},
+                 {:priority, :int32},
+                 {:active, :bool},
+                 {:notes, :string},
+                 {:tags, {:list, :string}}
+               ])
     end
 
     test "fails with non-existent source table", %{conn: conn} do
-      assert {:error, _reason} = Schema.create_rel_table(conn, "BAD_REL",
-        "NonExistent", "Person"
-      )
+      assert {:error, _reason} = Schema.create_rel_table(conn, "BAD_REL", "NonExistent", "Person")
     end
 
     test "fails with non-existent target table", %{conn: conn} do
-      assert {:error, _reason} = Schema.create_rel_table(conn, "BAD_REL",
-        "Person", "NonExistent"
-      )
+      assert {:error, _reason} = Schema.create_rel_table(conn, "BAD_REL", "Person", "NonExistent")
     end
 
     test "fails on duplicate relationship table", %{conn: conn} do
       Schema.create_rel_table!(conn, "FRIEND_OF", "Person", "Person")
 
-      assert {:error, _reason} = Schema.create_rel_table(conn, "FRIEND_OF",
-        "Person", "Person"
-      )
+      assert {:error, _reason} = Schema.create_rel_table(conn, "FRIEND_OF", "Person", "Person")
     end
   end
 
@@ -283,9 +290,10 @@ defmodule RyugraphEx.SchemaTest do
       assert {:ok, :dropped} = Schema.drop_node_table(conn, "ToDelete")
 
       # Verify table is gone by trying to recreate it
-      assert {:ok, :created} = Schema.create_node_table(conn, "ToDelete", [
-        {:id, :int64, primary_key: true}
-      ])
+      assert {:ok, :created} =
+               Schema.create_node_table(conn, "ToDelete", [
+                 {:id, :int64, primary_key: true}
+               ])
     end
 
     test "drops table with cascade option", %{conn: conn} do
@@ -293,22 +301,20 @@ defmodule RyugraphEx.SchemaTest do
       Schema.create_node_table!(conn, "Dependent", [
         {:id, :int64, primary_key: true}
       ])
+
       Schema.create_rel_table!(conn, "REFS", "Dependent", "ToDelete")
 
-      assert {:ok, :dropped} = Schema.drop_node_table(conn, "ToDelete",
-        cascade: true
-      )
+      assert {:ok, :dropped} = Schema.drop_node_table(conn, "ToDelete", cascade: true)
     end
 
     test "fails without cascade when dependencies exist", %{conn: conn} do
       Schema.create_node_table!(conn, "Dependent", [
         {:id, :int64, primary_key: true}
       ])
+
       Schema.create_rel_table!(conn, "REFS", "Dependent", "ToDelete")
 
-      assert {:error, _reason} = Schema.drop_node_table(conn, "ToDelete",
-        cascade: false
-      )
+      assert {:error, _reason} = Schema.drop_node_table(conn, "ToDelete", cascade: false)
     end
 
     test "fails on non-existent table", %{conn: conn} do
@@ -321,9 +327,11 @@ defmodule RyugraphEx.SchemaTest do
       Schema.create_node_table!(conn, "Node1", [
         {:id, :int64, primary_key: true}
       ])
+
       Schema.create_node_table!(conn, "Node2", [
         {:id, :int64, primary_key: true}
       ])
+
       Schema.create_rel_table!(conn, "REL_TO_DELETE", "Node1", "Node2")
 
       {:ok, conn: conn}
@@ -333,9 +341,7 @@ defmodule RyugraphEx.SchemaTest do
       assert {:ok, :dropped} = Schema.drop_rel_table(conn, "REL_TO_DELETE")
 
       # Verify we can recreate it
-      assert {:ok, :created} = Schema.create_rel_table(conn, "REL_TO_DELETE",
-        "Node1", "Node2"
-      )
+      assert {:ok, :created} = Schema.create_rel_table(conn, "REL_TO_DELETE", "Node1", "Node2")
     end
 
     test "fails on non-existent relationship table", %{conn: conn} do
@@ -353,9 +359,11 @@ defmodule RyugraphEx.SchemaTest do
       Schema.create_node_table!(conn, "Person", [
         {:id, :int64, primary_key: true}
       ])
+
       Schema.create_node_table!(conn, "Company", [
         {:id, :int64, primary_key: true}
       ])
+
       Schema.create_node_table!(conn, "Product", [
         {:id, :int64, primary_key: true}
       ])
@@ -368,6 +376,7 @@ defmodule RyugraphEx.SchemaTest do
       Schema.create_node_table!(conn, "Person", [
         {:id, :int64, primary_key: true}
       ])
+
       Schema.create_rel_table!(conn, "KNOWS", "Person", "Person")
 
       assert {:ok, tables} = Schema.list_node_tables(conn)
@@ -399,6 +408,7 @@ defmodule RyugraphEx.SchemaTest do
       Schema.create_node_table!(conn, "Person", [
         {:id, :int64, primary_key: true}
       ])
+
       Schema.create_node_table!(conn, "Company", [
         {:id, :int64, primary_key: true}
       ])
@@ -415,6 +425,7 @@ defmodule RyugraphEx.SchemaTest do
       Schema.create_node_table!(conn, "Person", [
         {:id, :int64, primary_key: true}
       ])
+
       Schema.create_rel_table!(conn, "KNOWS", "Person", "Person")
 
       assert {:ok, tables} = Schema.list_rel_tables(conn)
@@ -452,11 +463,14 @@ defmodule RyugraphEx.SchemaTest do
 
     test "identifies primary key columns", %{conn: conn} do
       # RyuGraph only supports single primary key (first one in composite list)
-      Schema.create_node_table!(conn, "Composite", [
-        {:key1, :int64},
-        {:key2, :string},
-        {:data, :string}
-      ], primary_key: [:key1, :key2])
+      Schema.create_node_table!(
+        conn,
+        "Composite",
+        [
+          {:key1, :int64},
+          {:key2, :string},
+          {:data, :string}
+        ], primary_key: [:key1, :key2])
 
       assert {:ok, info} = Schema.describe_table(conn, "Composite")
 
@@ -475,51 +489,51 @@ defmodule RyugraphEx.SchemaTest do
   describe "complex schema scenarios" do
     test "builds complete e-commerce schema", %{conn: conn} do
       # Users
-      assert {:ok, :created} = Schema.create_node_table(conn, "User", [
-        {:id, :int64, primary_key: true},
-        {:username, :string},
-        {:email, :string},
-        {:created_at, :timestamp}
-      ])
+      assert {:ok, :created} =
+               Schema.create_node_table(conn, "User", [
+                 {:id, :int64, primary_key: true},
+                 {:username, :string},
+                 {:email, :string},
+                 {:created_at, :timestamp}
+               ])
 
       # Products
-      assert {:ok, :created} = Schema.create_node_table(conn, "Product", [
-        {:id, :int64, primary_key: true},
-        {:sku, :string},
-        {:name, :string},
-        {:price, :double},
-        {:stock, :int32}
-      ])
+      assert {:ok, :created} =
+               Schema.create_node_table(conn, "Product", [
+                 {:id, :int64, primary_key: true},
+                 {:sku, :string},
+                 {:name, :string},
+                 {:price, :double},
+                 {:stock, :int32}
+               ])
 
       # Orders
-      assert {:ok, :created} = Schema.create_node_table(conn, "Order", [
-        {:id, :int64, primary_key: true},
-        {:order_date, :date},
-        {:total, :double},
-        {:status, :string}
-      ])
+      assert {:ok, :created} =
+               Schema.create_node_table(conn, "Order", [
+                 {:id, :int64, primary_key: true},
+                 {:order_date, :date},
+                 {:total, :double},
+                 {:status, :string}
+               ])
 
       # Relationships
-      assert {:ok, :created} = Schema.create_rel_table(conn, "PLACED",
-        "User", "Order", [
-          {:timestamp, :timestamp}
-        ]
-      )
+      assert {:ok, :created} =
+               Schema.create_rel_table(conn, "PLACED", "User", "Order", [
+                 {:timestamp, :timestamp}
+               ])
 
-      assert {:ok, :created} = Schema.create_rel_table(conn, "CONTAINS",
-        "Order", "Product", [
-          {:quantity, :int32},
-          {:unit_price, :double}
-        ]
-      )
+      assert {:ok, :created} =
+               Schema.create_rel_table(conn, "CONTAINS", "Order", "Product", [
+                 {:quantity, :int32},
+                 {:unit_price, :double}
+               ])
 
-      assert {:ok, :created} = Schema.create_rel_table(conn, "REVIEWED",
-        "User", "Product", [
-          {:rating, :int8},
-          {:comment, :string},
-          {:date, :date}
-        ]
-      )
+      assert {:ok, :created} =
+               Schema.create_rel_table(conn, "REVIEWED", "User", "Product", [
+                 {:rating, :int8},
+                 {:comment, :string},
+                 {:date, :date}
+               ])
 
       # Create indexes
       assert {:ok, :created} = Schema.create_index(conn, "User", :email)
@@ -536,55 +550,74 @@ defmodule RyugraphEx.SchemaTest do
 
     test "builds social network schema", %{conn: conn} do
       # Core entities
-      assert {:ok, :created} = Schema.create_node_table(conn, "User", [
-        {:id, :int64, primary_key: true},
-        {:username, :string},
-        {:display_name, :string},
-        {:bio, :string},
-        {:joined_at, :timestamp}
-      ])
+      assert {:ok, :created} =
+               Schema.create_node_table(conn, "User", [
+                 {:id, :int64, primary_key: true},
+                 {:username, :string},
+                 {:display_name, :string},
+                 {:bio, :string},
+                 {:joined_at, :timestamp}
+               ])
 
-      assert {:ok, :created} = Schema.create_node_table(conn, "Post", [
-        {:id, :int64, primary_key: true},
-        {:content, :string},
-        {:created_at, :timestamp},
-        {:likes_count, :int32},
-        {:shares_count, :int32}
-      ])
+      assert {:ok, :created} =
+               Schema.create_node_table(conn, "Post", [
+                 {:id, :int64, primary_key: true},
+                 {:content, :string},
+                 {:created_at, :timestamp},
+                 {:likes_count, :int32},
+                 {:shares_count, :int32}
+               ])
 
-      assert {:ok, :created} = Schema.create_node_table(conn, "Group", [
-        {:id, :int64, primary_key: true},
-        {:name, :string},
-        {:description, :string},
-        {:created_at, :timestamp},
-        {:is_public, :bool}
-      ])
+      assert {:ok, :created} =
+               Schema.create_node_table(conn, "Group", [
+                 {:id, :int64, primary_key: true},
+                 {:name, :string},
+                 {:description, :string},
+                 {:created_at, :timestamp},
+                 {:is_public, :bool}
+               ])
 
       # Relationships with various multiplicities
-      assert {:ok, :created} = Schema.create_rel_table(conn, "FOLLOWS",
-        "User", "User", [
-          {:since, :timestamp}
-        ], multiplicity: :many_to_many
-      )
+      assert {:ok, :created} =
+               Schema.create_rel_table(
+                 conn,
+                 "FOLLOWS",
+                 "User",
+                 "User",
+                 [
+                   {:since, :timestamp}
+                 ], multiplicity: :many_to_many)
 
-      assert {:ok, :created} = Schema.create_rel_table(conn, "POSTED",
-        "User", "Post", [
-          {:timestamp, :timestamp}
-        ], multiplicity: :one_to_many
-      )
+      assert {:ok, :created} =
+               Schema.create_rel_table(
+                 conn,
+                 "POSTED",
+                 "User",
+                 "Post",
+                 [
+                   {:timestamp, :timestamp}
+                 ], multiplicity: :one_to_many)
 
-      assert {:ok, :created} = Schema.create_rel_table(conn, "LIKED",
-        "User", "Post", [
-          {:timestamp, :timestamp}
-        ], multiplicity: :many_to_many
-      )
+      assert {:ok, :created} =
+               Schema.create_rel_table(
+                 conn,
+                 "LIKED",
+                 "User",
+                 "Post",
+                 [
+                   {:timestamp, :timestamp}
+                 ], multiplicity: :many_to_many)
 
-      assert {:ok, :created} = Schema.create_rel_table(conn, "MEMBER_OF",
-        "User", "Group", [
-          {:joined_at, :timestamp},
-          {:role, :string}
-        ], multiplicity: :many_to_many
-      )
+      assert {:ok, :created} =
+               Schema.create_rel_table(
+                 conn,
+                 "MEMBER_OF",
+                 "User",
+                 "Group",
+                 [
+                   {:joined_at, :timestamp},
+                   {:role, :string}
+                 ], multiplicity: :many_to_many)
 
       # Complex indexes
       assert {:ok, :created} = Schema.create_index(conn, "User", :username)

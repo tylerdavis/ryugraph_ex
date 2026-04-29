@@ -21,10 +21,12 @@ defmodule RyugraphEx.DatabaseTest do
     end
 
     test "creates an in-memory database with custom config" do
-      assert {:ok, db} = Database.in_memory(
-        max_num_threads: 2,
-        buffer_pool_size: 1024 * 1024 * 10
-      )
+      assert {:ok, db} =
+               Database.in_memory(
+                 max_num_threads: 2,
+                 buffer_pool_size: 1024 * 1024 * 10
+               )
+
       assert is_reference(db)
     end
 
@@ -46,10 +48,12 @@ defmodule RyugraphEx.DatabaseTest do
     end
 
     test "ignores unknown configuration options" do
-      assert {:ok, db} = Database.in_memory(
-        unknown_option: "value",
-        max_num_threads: 2
-      )
+      assert {:ok, db} =
+               Database.in_memory(
+                 unknown_option: "value",
+                 max_num_threads: 2
+               )
+
       assert is_reference(db)
     end
 
@@ -67,10 +71,12 @@ defmodule RyugraphEx.DatabaseTest do
     end
 
     test "opens a database with custom config", %{db_path: db_path} do
-      assert {:ok, db} = Database.open(db_path,
-        max_num_threads: 4,
-        enable_compression: true
-      )
+      assert {:ok, db} =
+               Database.open(db_path,
+                 max_num_threads: 4,
+                 enable_compression: true
+               )
+
       assert is_reference(db)
     end
 
@@ -149,12 +155,14 @@ defmodule RyugraphEx.DatabaseTest do
     test "raises on invalid configuration" do
       # RyuGraph may not validate all configs upfront, so this may succeed
       # or fail depending on underlying implementation
-      result = try do
-        Database.in_memory!(max_num_threads: -1)
-        :ok
-      rescue
-        _ -> :error
-      end
+      result =
+        try do
+          Database.in_memory!(max_num_threads: -1)
+          :ok
+        rescue
+          _ -> :error
+        end
+
       assert result in [:ok, :error]
     end
   end
@@ -192,14 +200,15 @@ defmodule RyugraphEx.DatabaseTest do
     test "can create multiple databases concurrently" do
       tmp_dir = System.tmp_dir!()
 
-      tasks = for i <- 1..5 do
-        Task.async(fn ->
-          path = Path.join(tmp_dir, "concurrent_db_#{i}")
-          result = Database.open(path)
-          File.rm_rf(path)
-          result
-        end)
-      end
+      tasks =
+        for i <- 1..5 do
+          Task.async(fn ->
+            path = Path.join(tmp_dir, "concurrent_db_#{i}")
+            result = Database.open(path)
+            File.rm_rf(path)
+            result
+          end)
+        end
 
       results = Task.await_many(tasks)
 

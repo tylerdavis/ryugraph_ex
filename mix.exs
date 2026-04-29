@@ -17,7 +17,8 @@ defmodule RyugraphEx.MixProject do
       ],
 
       # Hex.pm package metadata
-      description: "Elixir NIF bindings for RyuGraph - an embedded property graph database with Cypher query support",
+      description:
+        "Elixir NIF bindings for RyuGraph - an embedded property graph database with Cypher query support",
       package: package(),
 
       # Documentation
@@ -28,10 +29,10 @@ defmodule RyugraphEx.MixProject do
         main: "RyugraphEx",
         extras: ["README.md", "CHANGELOG.md"],
         groups_for_modules: [
-          "Core": [RyugraphEx, RyugraphEx.Database, RyugraphEx.Connection],
+          Core: [RyugraphEx, RyugraphEx.Database, RyugraphEx.Connection],
           "Graph Operations": [RyugraphEx.Graph],
           "Schema Management": [RyugraphEx.Schema],
-          "Internal": [RyugraphEx.Native]
+          Internal: [RyugraphEx.Native]
         ]
       ]
     ]

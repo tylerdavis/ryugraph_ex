@@ -7,10 +7,12 @@ defmodule RyugraphExIntegrationTest do
   describe "end-to-end social network scenario" do
     setup do
       # Create in-memory database
-      {:ok, db} = Database.in_memory(
-        buffer_pool_size: 1024 * 1024 * 10,
-        max_num_threads: 2
-      )
+      {:ok, db} =
+        Database.in_memory(
+          buffer_pool_size: 1024 * 1024 * 10,
+          max_num_threads: 2
+        )
+
       {:ok, conn} = Connection.new(db)
 
       # Create schema
@@ -51,16 +53,19 @@ defmodule RyugraphExIntegrationTest do
 
     test "complete social network workflow", %{conn: conn} do
       # Create users
-      users = for i <- 1..5 do
-        {:ok, user} = Graph.create_node(conn, "User",
-          id: i,
-          username: "user#{i}",
-          email: "user#{i}@example.com",
-          age: 20 + i * 3
-        )
-        {i, user}
-      end
-      |> Map.new()
+      users =
+        for i <- 1..5 do
+          {:ok, user} =
+            Graph.create_node(conn, "User",
+              id: i,
+              username: "user#{i}",
+              email: "user#{i}@example.com",
+              age: 20 + i * 3
+            )
+
+          {i, user}
+        end
+        |> Map.new()
 
       # Create follow relationships
       Graph.create_relationship!(conn, users[1].id, users[2].id, "FOLLOWS")
@@ -70,15 +75,18 @@ defmodule RyugraphExIntegrationTest do
       Graph.create_relationship!(conn, users[4].id, users[5].id, "FOLLOWS")
 
       # Create posts
-      posts = for i <- 1..3 do
-        {:ok, post} = Graph.create_node(conn, "Post",
-          id: i,
-          content: "Post #{i} content",
-          likes: i * 10
-        )
-        {i, post}
-      end
-      |> Map.new()
+      posts =
+        for i <- 1..3 do
+          {:ok, post} =
+            Graph.create_node(conn, "Post",
+              id: i,
+              content: "Post #{i} content",
+              likes: i * 10
+            )
+
+          {i, post}
+        end
+        |> Map.new()
 
       # Users create posts
       Graph.create_relationship!(conn, users[1].id, posts[1].id, "POSTED")
@@ -91,48 +99,56 @@ defmodule RyugraphExIntegrationTest do
       Graph.create_relationship!(conn, users[4].id, posts[2].id, "LIKED")
 
       # Query: Find all users that user1 follows
-      {:ok, following} = Graph.get_neighbors(conn, users[1].id,
-        direction: :out,
-        rel_label: "FOLLOWS"
-      )
+      {:ok, following} =
+        Graph.get_neighbors(conn, users[1].id,
+          direction: :out,
+          rel_label: "FOLLOWS"
+        )
+
       assert length(following) == 2
 
       # Query: Find posts by users that user1 follows
-      {:ok, results} = Connection.query(conn, """
-        MATCH (u1:User {id: 1})-[:FOLLOWS]->(u2:User)-[:POSTED]->(p:Post)
-        RETURN u2.username AS author, p.content AS content
-        ORDER BY u2.id;
-      """)
+      {:ok, results} =
+        Connection.query(conn, """
+          MATCH (u1:User {id: 1})-[:FOLLOWS]->(u2:User)-[:POSTED]->(p:Post)
+          RETURN u2.username AS author, p.content AS content
+          ORDER BY u2.id;
+        """)
+
       assert length(results) == 2
       assert hd(results)["author"] == "user2"
 
       # Query: Find most liked posts
-      {:ok, popular_posts} = Connection.query(conn, """
-        MATCH (p:Post)
-        OPTIONAL MATCH (u:User)-[:LIKED]->(p)
-        RETURN p.content AS content, count(u) AS like_count
-        ORDER BY like_count DESC
-        LIMIT 2;
-      """)
+      {:ok, popular_posts} =
+        Connection.query(conn, """
+          MATCH (p:Post)
+          OPTIONAL MATCH (u:User)-[:LIKED]->(p)
+          RETURN p.content AS content, count(u) AS like_count
+          ORDER BY like_count DESC
+          LIMIT 2;
+        """)
+
       assert length(popular_posts) <= 3
 
       # Query: Find shortest path between users
-      {:ok, path} = Graph.shortest_path(conn, users[1].id, users[5].id,
-        rel_label: "FOLLOWS"
-      )
+      {:ok, path} = Graph.shortest_path(conn, users[1].id, users[5].id, rel_label: "FOLLOWS")
       assert path[:nodes] != nil
       assert path[:rels] != nil
 
       # Transaction: Update post likes count
       Connection.transaction(conn, fn conn ->
-        {:ok, _} = Connection.query(conn, """
-          MATCH (p:Post {id: 1})
-          SET p.likes = p.likes + 1;
-        """)
-        {:ok, _} = Connection.query(conn, """
-          MATCH (p:Post {id: 2})
-          SET p.likes = p.likes + 2;
-        """)
+        {:ok, _} =
+          Connection.query(conn, """
+            MATCH (p:Post {id: 1})
+            SET p.likes = p.likes + 1;
+          """)
+
+        {:ok, _} =
+          Connection.query(conn, """
+            MATCH (p:Post {id: 2})
+            SET p.likes = p.likes + 2;
+          """)
+
         {:ok, :updated}
       end)
     end
@@ -185,44 +201,51 @@ defmodule RyugraphExIntegrationTest do
 
     test "complete purchase workflow", %{conn: conn} do
       # Create customers
-      {:ok, customer1} = Graph.create_node(conn, "Customer",
-        id: 1,
-        name: "Alice",
-        email: "alice@example.com",
-        credit: 1000.0
-      )
+      {:ok, customer1} =
+        Graph.create_node(conn, "Customer",
+          id: 1,
+          name: "Alice",
+          email: "alice@example.com",
+          credit: 1000.0
+        )
 
-      {:ok, customer2} = Graph.create_node(conn, "Customer",
-        id: 2,
-        name: "Bob",
-        email: "bob@example.com",
-        credit: 500.0
-      )
+      {:ok, customer2} =
+        Graph.create_node(conn, "Customer",
+          id: 2,
+          name: "Bob",
+          email: "bob@example.com",
+          credit: 500.0
+        )
 
       # Create products
-      products = for i <- 1..5 do
-        {:ok, product} = Graph.create_node(conn, "Product",
-          id: i,
-          name: "Product#{i}",
-          price: 50.0 * i,
-          stock: 100
-        )
-        {i, product}
-      end
-      |> Map.new()
+      products =
+        for i <- 1..5 do
+          {:ok, product} =
+            Graph.create_node(conn, "Product",
+              id: i,
+              name: "Product#{i}",
+              price: 50.0 * i,
+              stock: 100
+            )
+
+          {i, product}
+        end
+        |> Map.new()
 
       # Create orders
-      {:ok, order1} = Graph.create_node(conn, "Order",
-        id: 1,
-        total: 300.0,
-        status: "completed"
-      )
+      {:ok, order1} =
+        Graph.create_node(conn, "Order",
+          id: 1,
+          total: 300.0,
+          status: "completed"
+        )
 
-      {:ok, order2} = Graph.create_node(conn, "Order",
-        id: 2,
-        total: 150.0,
-        status: "pending"
-      )
+      {:ok, order2} =
+        Graph.create_node(conn, "Order",
+          id: 2,
+          total: 150.0,
+          status: "pending"
+        )
 
       # Connect customers to orders
       Graph.create_relationship!(conn, customer1.id, order1.id, "PLACED")
@@ -233,6 +256,7 @@ defmodule RyugraphExIntegrationTest do
         quantity: 2,
         unit_price: 50.0
       )
+
       Graph.create_relationship!(conn, order1.id, products[2].id, "CONTAINS",
         quantity: 1,
         unit_price: 100.0
@@ -245,57 +269,67 @@ defmodule RyugraphExIntegrationTest do
       )
 
       # Query: Find all products purchased by a customer
-      {:ok, purchased} = Connection.query(conn, """
-        MATCH (c:Customer {id: 1})-[p:PURCHASED]->(prod:Product)
-        RETURN prod.name AS product, p.quantity AS quantity, p.price AS total_paid;
-      """)
+      {:ok, purchased} =
+        Connection.query(conn, """
+          MATCH (c:Customer {id: 1})-[p:PURCHASED]->(prod:Product)
+          RETURN prod.name AS product, p.quantity AS quantity, p.price AS total_paid;
+        """)
+
       assert length(purchased) >= 1
       assert hd(purchased)["quantity"] == 2
 
       # Query: Calculate total sales per product
       # Note: "Order" is a reserved word in Cypher, need to escape it
-      {:ok, sales} = Connection.query(conn, """
-        MATCH (o:`Order`)-[c:CONTAINS]->(p:Product)
-        WHERE o.status = 'completed'
-        RETURN p.name AS product, sum(c.quantity) AS units_sold, sum(c.quantity * c.unit_price) AS revenue
-        ORDER BY revenue DESC;
-      """)
+      {:ok, sales} =
+        Connection.query(conn, """
+          MATCH (o:`Order`)-[c:CONTAINS]->(p:Product)
+          WHERE o.status = 'completed'
+          RETURN p.name AS product, sum(c.quantity) AS units_sold, sum(c.quantity * c.unit_price) AS revenue
+          ORDER BY revenue DESC;
+        """)
+
       assert is_list(sales)
 
       # Transaction: Process a new order
-      result = Connection.transaction(conn, fn conn ->
-        # Check stock
-        {:ok, [stock_check]} = Connection.query(conn, """
-          MATCH (p:Product {id: 3})
-          RETURN p.stock AS stock;
-        """)
+      result =
+        Connection.transaction(conn, fn conn ->
+          # Check stock
+          {:ok, [stock_check]} =
+            Connection.query(conn, """
+              MATCH (p:Product {id: 3})
+              RETURN p.stock AS stock;
+            """)
 
-        if stock_check["stock"] >= 2 do
-          # Update stock
-          {:ok, _} = Connection.query(conn, """
-            MATCH (p:Product {id: 3})
-            SET p.stock = p.stock - 2;
-          """)
+          if stock_check["stock"] >= 2 do
+            # Update stock
+            {:ok, _} =
+              Connection.query(conn, """
+                MATCH (p:Product {id: 3})
+                SET p.stock = p.stock - 2;
+              """)
 
-          # Deduct credit
-          {:ok, _} = Connection.query(conn, """
-            MATCH (c:Customer {id: 1})
-            SET c.credit = c.credit - 300.0;
-          """)
+            # Deduct credit
+            {:ok, _} =
+              Connection.query(conn, """
+                MATCH (c:Customer {id: 1})
+                SET c.credit = c.credit - 300.0;
+              """)
 
-          {:ok, :order_processed}
-        else
-          {:error, :insufficient_stock}
-        end
-      end)
+            {:ok, :order_processed}
+          else
+            {:error, :insufficient_stock}
+          end
+        end)
 
       assert result == {:ok, :order_processed}
 
       # Verify the transaction results
-      {:ok, [customer_check]} = Connection.query(conn, """
-        MATCH (c:Customer {id: 1})
-        RETURN c.credit AS credit;
-      """)
+      {:ok, [customer_check]} =
+        Connection.query(conn, """
+          MATCH (c:Customer {id: 1})
+          RETURN c.credit AS credit;
+        """)
+
       assert customer_check["credit"] == 700.0
     end
   end
@@ -343,25 +377,29 @@ defmodule RyugraphExIntegrationTest do
         %{id: 5, name: "Linear Algebra", category: "Math"}
       ]
 
-      concept_nodes = for concept <- concepts do
-        {:ok, node} = Graph.create_node(conn, "Concept", concept)
-        {concept.id, node}
-      end
-      |> Map.new()
+      concept_nodes =
+        for concept <- concepts do
+          {:ok, node} = Graph.create_node(conn, "Concept", concept)
+          {concept.id, node}
+        end
+        |> Map.new()
 
       # Create concept relationships
       Graph.create_relationship!(conn, concept_nodes[1].id, concept_nodes[2].id, "RELATED_TO",
         weight: 0.9,
         type: "includes"
       )
+
       Graph.create_relationship!(conn, concept_nodes[2].id, concept_nodes[3].id, "RELATED_TO",
         weight: 0.95,
         type: "subset"
       )
+
       Graph.create_relationship!(conn, concept_nodes[1].id, concept_nodes[4].id, "RELATED_TO",
         weight: 0.7,
         type: "uses"
       )
+
       Graph.create_relationship!(conn, concept_nodes[3].id, concept_nodes[5].id, "RELATED_TO",
         weight: 0.8,
         type: "requires"
@@ -390,48 +428,61 @@ defmodule RyugraphExIntegrationTest do
       """)
 
       # Query: Find related concepts
-      {:ok, related} = Connection.query(conn, """
-        MATCH (c1:Concept {name: 'Machine Learning'})-[r:RELATED_TO]->(c2:Concept)
-        RETURN c2.name AS concept, r.type AS relationship, r.weight AS weight
-        ORDER BY r.weight DESC;
-      """)
+      {:ok, related} =
+        Connection.query(conn, """
+          MATCH (c1:Concept {name: 'Machine Learning'})-[r:RELATED_TO]->(c2:Concept)
+          RETURN c2.name AS concept, r.type AS relationship, r.weight AS weight
+          ORDER BY r.weight DESC;
+        """)
+
       assert length(related) >= 2
 
       # Query: Find documents mentioning AI concepts
-      {:ok, ai_docs} = Connection.query(conn, """
-        MATCH (d:Document)-[m:MENTIONS]->(c:Concept)
-        WHERE c.category = 'AI'
-        RETURN d.title AS document, c.name AS concept, m.relevance AS relevance
-        ORDER BY m.relevance DESC;
-      """)
+      {:ok, ai_docs} =
+        Connection.query(conn, """
+          MATCH (d:Document)-[m:MENTIONS]->(c:Concept)
+          WHERE c.category = 'AI'
+          RETURN d.title AS document, c.name AS concept, m.relevance AS relevance
+          ORDER BY m.relevance DESC;
+        """)
+
       assert length(ai_docs) >= 2
 
       # Query: Find concept paths
-      {:ok, path} = Graph.shortest_path(conn,
-        concept_nodes[1].id,  # Machine Learning
-        concept_nodes[5].id,  # Linear Algebra
-        rel_label: "RELATED_TO"
-      )
+      {:ok, path} =
+        Graph.shortest_path(
+          conn,
+          # Machine Learning
+          concept_nodes[1].id,
+          # Linear Algebra
+          concept_nodes[5].id,
+          rel_label: "RELATED_TO"
+        )
+
       assert path[:nodes] != nil
 
       # Complex query: Concept co-occurrence in documents
-      {:ok, cooccurrence} = Connection.query(conn, """
-        MATCH (d:Document)-[:MENTIONS]->(c1:Concept),
-              (d)-[:MENTIONS]->(c2:Concept)
-        WHERE id(c1) < id(c2)
-        RETURN c1.name AS concept1, c2.name AS concept2, count(d) AS shared_documents
-        ORDER BY shared_documents DESC;
-      """)
+      {:ok, cooccurrence} =
+        Connection.query(conn, """
+          MATCH (d:Document)-[:MENTIONS]->(c1:Concept),
+                (d)-[:MENTIONS]->(c2:Concept)
+          WHERE id(c1) < id(c2)
+          RETURN c1.name AS concept1, c2.name AS concept2, count(d) AS shared_documents
+          ORDER BY shared_documents DESC;
+        """)
+
       assert is_list(cooccurrence)
     end
   end
 
   describe "performance and concurrency" do
     setup do
-      {:ok, db} = Database.in_memory(
-        buffer_pool_size: 1024 * 1024 * 50,
-        max_num_threads: 4
-      )
+      {:ok, db} =
+        Database.in_memory(
+          buffer_pool_size: 1024 * 1024 * 50,
+          max_num_threads: 4
+        )
+
       {:ok, conn} = Connection.new(db)
 
       Schema.create_node_table!(conn, "Node", [
@@ -451,9 +502,10 @@ defmodule RyugraphExIntegrationTest do
 
     test "handles bulk insertions", %{conn: conn} do
       # Prepare statement for bulk insertion
-      {:ok, prepared} = Connection.prepare(conn, """
-        CREATE (:Node {id: $id, value: $value, name: $name});
-      """)
+      {:ok, prepared} =
+        Connection.prepare(conn, """
+          CREATE (:Node {id: $id, value: $value, name: $name});
+        """)
 
       # Insert many nodes
       for i <- 1..100 do
@@ -465,10 +517,12 @@ defmodule RyugraphExIntegrationTest do
       end
 
       # Verify insertion
-      {:ok, [count_result]} = Connection.query(conn, """
-        MATCH (n:Node)
-        RETURN count(n) AS count;
-      """)
+      {:ok, [count_result]} =
+        Connection.query(conn, """
+          MATCH (n:Node)
+          RETURN count(n) AS count;
+        """)
+
       assert count_result["count"] == 100
 
       # Create relationships in bulk
@@ -480,24 +534,28 @@ defmodule RyugraphExIntegrationTest do
       end
 
       # Query with aggregation
-      {:ok, aggregates} = Connection.query(conn, """
-        MATCH (n:Node)
-        RETURN n.value AS value, count(n) AS count
-        ORDER BY value;
-      """)
+      {:ok, aggregates} =
+        Connection.query(conn, """
+          MATCH (n:Node)
+          RETURN n.value AS value, count(n) AS count
+          ORDER BY value;
+        """)
+
       assert length(aggregates) == 10
       assert Enum.all?(aggregates, fn row -> row["count"] == 10 end)
     end
 
     test "concurrent reads work correctly", %{conn: _conn, db: db} do
       # Create multiple connections
-      connections = for _ <- 1..5 do
-        {:ok, conn} = Connection.new(db)
-        conn
-      end
+      connections =
+        for _ <- 1..5 do
+          {:ok, conn} = Connection.new(db)
+          conn
+        end
 
       # Insert test data
       main_conn = hd(connections)
+
       for i <- 1..10 do
         Graph.create_node!(main_conn, "Node",
           id: i,
@@ -507,17 +565,20 @@ defmodule RyugraphExIntegrationTest do
       end
 
       # Concurrent reads
-      tasks = for {conn, idx} <- Enum.with_index(connections) do
-        Task.async(fn ->
-          {:ok, results} = Connection.query(conn, """
-            MATCH (n:Node)
-            WHERE n.value >= #{idx * 20}
-            RETURN n.name AS name, n.value AS value
-            ORDER BY n.value;
-          """)
-          {idx, results}
-        end)
-      end
+      tasks =
+        for {conn, idx} <- Enum.with_index(connections) do
+          Task.async(fn ->
+            {:ok, results} =
+              Connection.query(conn, """
+                MATCH (n:Node)
+                WHERE n.value >= #{idx * 20}
+                RETURN n.name AS name, n.value AS value
+                ORDER BY n.value;
+              """)
+
+            {idx, results}
+          end)
+        end
 
       results = Task.await_many(tasks, 5000)
       assert length(results) == 5
@@ -533,19 +594,24 @@ defmodule RyugraphExIntegrationTest do
       )
 
       # Successful transaction
-      assert {:ok, :incremented} = Connection.transaction(conn, fn conn ->
-        {:ok, _} = Connection.query(conn, """
-          MATCH (n:Node {id: 1000})
-          SET n.value = n.value + 1;
-        """)
-        {:ok, :incremented}
-      end)
+      assert {:ok, :incremented} =
+               Connection.transaction(conn, fn conn ->
+                 {:ok, _} =
+                   Connection.query(conn, """
+                     MATCH (n:Node {id: 1000})
+                     SET n.value = n.value + 1;
+                   """)
+
+                 {:ok, :incremented}
+               end)
 
       # Verify increment
-      {:ok, [result1]} = Connection.query(conn, """
-        MATCH (n:Node {id: 1000})
-        RETURN n.value AS value;
-      """)
+      {:ok, [result1]} =
+        Connection.query(conn, """
+          MATCH (n:Node {id: 1000})
+          RETURN n.value AS value;
+        """)
+
       assert result1["value"] == 1
 
       # Failed transaction (should rollback)
@@ -555,15 +621,18 @@ defmodule RyugraphExIntegrationTest do
             MATCH (n:Node {id: 1000})
             SET n.value = n.value + 10;
           """)
+
           raise "Simulated failure"
         end)
       end
 
       # Verify rollback (value should still be 1)
-      {:ok, [result2]} = Connection.query(conn, """
-        MATCH (n:Node {id: 1000})
-        RETURN n.value AS value;
-      """)
+      {:ok, [result2]} =
+        Connection.query(conn, """
+          MATCH (n:Node {id: 1000})
+          RETURN n.value AS value;
+        """)
+
       assert result2["value"] == 1
     end
   end
@@ -597,35 +666,40 @@ defmodule RyugraphExIntegrationTest do
       end
 
       # Prepare complex query
-      {:ok, prepared} = Connection.prepare(conn, """
-        MATCH (e:Entity)
-        WHERE e.type = $type
-          AND e.score >= $min_score
-          AND e.score <= $max_score
-          AND e.active = $active
-        RETURN e.name AS name, e.score AS score
-        ORDER BY e.score DESC
-        LIMIT $limit;
-      """)
+      {:ok, prepared} =
+        Connection.prepare(conn, """
+          MATCH (e:Entity)
+          WHERE e.type = $type
+            AND e.score >= $min_score
+            AND e.score <= $max_score
+            AND e.active = $active
+          RETURN e.name AS name, e.score AS score
+          ORDER BY e.score DESC
+          LIMIT $limit;
+        """)
 
       # Execute with different parameters
-      {:ok, results1} = Connection.execute(conn, prepared,
-        type: "A",
-        min_score: 10.0,
-        max_score: 25.0,
-        active: true,
-        limit: 5
-      )
+      {:ok, results1} =
+        Connection.execute(conn, prepared,
+          type: "A",
+          min_score: 10.0,
+          max_score: 25.0,
+          active: true,
+          limit: 5
+        )
+
       assert is_list(results1)
       assert Enum.all?(results1, fn r -> r["score"] >= 10.0 and r["score"] <= 25.0 end)
 
-      {:ok, results2} = Connection.execute(conn, prepared,
-        type: "B",
-        min_score: 0.0,
-        max_score: 20.0,
-        active: true,
-        limit: 10
-      )
+      {:ok, results2} =
+        Connection.execute(conn, prepared,
+          type: "B",
+          min_score: 0.0,
+          max_score: 20.0,
+          active: true,
+          limit: 10
+        )
+
       assert is_list(results2)
       assert Enum.all?(results2, fn r -> r["score"] <= 20.0 end)
     end
@@ -641,31 +715,36 @@ defmodule RyugraphExIntegrationTest do
       )
 
       # Prepare update statement
-      {:ok, update_prepared} = Connection.prepare(conn, """
-        MATCH (e:Entity {id: $id})
-        SET e.score = $new_score,
-            e.active = $new_active,
-            e.name = $new_name
-        RETURN e.score AS score, e.active AS active, e.name AS name;
-      """)
+      {:ok, update_prepared} =
+        Connection.prepare(conn, """
+          MATCH (e:Entity {id: $id})
+          SET e.score = $new_score,
+              e.active = $new_active,
+              e.name = $new_name
+          RETURN e.score AS score, e.active AS active, e.name AS name;
+        """)
 
       # Execute updates
-      {:ok, [result1]} = Connection.execute(conn, update_prepared,
-        id: 100,
-        new_score: 75.0,
-        new_active: false,
-        new_name: "Updated1"
-      )
+      {:ok, [result1]} =
+        Connection.execute(conn, update_prepared,
+          id: 100,
+          new_score: 75.0,
+          new_active: false,
+          new_name: "Updated1"
+        )
+
       assert result1["score"] == 75.0
       assert result1["active"] == false
       assert result1["name"] == "Updated1"
 
-      {:ok, [result2]} = Connection.execute(conn, update_prepared,
-        id: 100,
-        new_score: 100.0,
-        new_active: true,
-        new_name: "Updated2"
-      )
+      {:ok, [result2]} =
+        Connection.execute(conn, update_prepared,
+          id: 100,
+          new_score: 100.0,
+          new_active: true,
+          new_name: "Updated2"
+        )
+
       assert result2["score"] == 100.0
       assert result2["active"] == true
       assert result2["name"] == "Updated2"

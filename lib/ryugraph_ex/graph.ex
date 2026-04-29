@@ -93,17 +93,23 @@ defmodule RyugraphEx.Graph do
       {:ok, [%{"r" => rel}]} ->
         atomized = atomize_keys(rel)
         # Ensure properties field exists and clean up nil values
-        atomized = if Map.has_key?(atomized, :properties) do
-          # Convert nil properties to empty map and filter out nil values
-          props = atomized[:properties] || %{}
-          props = props |> Enum.reject(fn {_k, v} -> is_nil(v) end) |> Map.new()
-          Map.put(atomized, :properties, props)
-        else
-          Map.put(atomized, :properties, %{})
-        end
+        atomized =
+          if Map.has_key?(atomized, :properties) do
+            # Convert nil properties to empty map and filter out nil values
+            props = atomized[:properties] || %{}
+            props = props |> Enum.reject(fn {_k, v} -> is_nil(v) end) |> Map.new()
+            Map.put(atomized, :properties, props)
+          else
+            Map.put(atomized, :properties, %{})
+          end
+
         {:ok, atomized}
-      {:ok, _} -> {:error, "Unexpected result format"}
-      error -> error
+
+      {:ok, _} ->
+        {:error, "Unexpected result format"}
+
+      error ->
+        error
     end
   end
 
@@ -119,9 +125,9 @@ defmodule RyugraphEx.Graph do
       id
     end
   end
+
   defp extract_user_id(id) when is_integer(id), do: id
   defp extract_user_id(id), do: id
-
 
   @doc """
   Creates a relationship between two nodes, raising on error.
@@ -179,10 +185,12 @@ defmodule RyugraphEx.Graph do
 
     case Connection.query(conn, query) do
       {:ok, results} ->
-        nodes = Enum.map(results, fn
-          %{"n" => node} -> atomize_keys(node)
-          result -> atomize_keys(result)
-        end)
+        nodes =
+          Enum.map(results, fn
+            %{"n" => node} -> atomize_keys(node)
+            result -> atomize_keys(result)
+          end)
+
         {:ok, nodes}
 
       error ->
@@ -266,9 +274,18 @@ defmodule RyugraphEx.Graph do
         # Convert path format to include nodes and rels arrays
         formatted_path = format_path(path)
         {:ok, formatted_path}
+
       {:ok, []} ->
         # No path of this length, try longer
-        find_shortest_path_iteratively(conn, from_id, to_id, rel_pattern, current_len + 1, max_len)
+        find_shortest_path_iteratively(
+          conn,
+          from_id,
+          to_id,
+          rel_pattern,
+          current_len + 1,
+          max_len
+        )
+
       error ->
         error
     end
@@ -375,14 +392,21 @@ defmodule RyugraphEx.Graph do
       WHERE n.id = #{id}
       RETURN n;
       """
+
       case Connection.query(conn, query) do
         {:ok, [%{"n" => node}]} ->
           atomized = atomize_keys(node)
           # Ensure all properties are present by normalizing the result
           {:ok, normalize_node_properties(atomized)}
-        {:ok, []} -> {:error, "Node not found"}
-        {:ok, _} -> {:error, "Unexpected result format"}
-        error -> error
+
+        {:ok, []} ->
+          {:error, "Node not found"}
+
+        {:ok, _} ->
+          {:error, "Unexpected result format"}
+
+        error ->
+          error
       end
     else
       # First get the node to see what properties exist
@@ -396,9 +420,11 @@ defmodule RyugraphEx.Graph do
         {:ok, [%{"n" => node}]} ->
           # Only update properties that already exist in the schema
           existing_props = Map.get(node, "properties", %{})
-          valid_properties = Enum.filter(properties, fn {key, _value} ->
-            Map.has_key?(existing_props, to_string(key))
-          end)
+
+          valid_properties =
+            Enum.filter(properties, fn {key, _value} ->
+              Map.has_key?(existing_props, to_string(key))
+            end)
 
           if valid_properties == [] do
             # No valid properties to update, return node as-is
@@ -417,9 +443,15 @@ defmodule RyugraphEx.Graph do
               {:ok, [%{"n" => updated_node}]} ->
                 atomized = atomize_keys(updated_node)
                 {:ok, normalize_node_properties(atomized)}
-              {:ok, []} -> {:error, "Node not found"}
-              {:ok, _} -> {:error, "Unexpected result format"}
-              error -> error
+
+              {:ok, []} ->
+                {:error, "Node not found"}
+
+              {:ok, _} ->
+                {:error, "Unexpected result format"}
+
+              error ->
+                error
             end
           end
 
@@ -431,7 +463,6 @@ defmodule RyugraphEx.Graph do
       end
     end
   end
-
 
   @doc """
   Updates properties of a node, raising on error.
@@ -594,9 +625,32 @@ defmodule RyugraphEx.Graph do
   # Escape label if it's a reserved keyword
   defp escape_label(label) do
     reserved = [
-      "order", "group", "by", "where", "return", "match", "create", "delete",
-      "set", "merge", "with", "union", "all", "distinct", "limit", "skip",
-      "desc", "asc", "and", "or", "not", "exists", "in", "as", "from", "to",
+      "order",
+      "group",
+      "by",
+      "where",
+      "return",
+      "match",
+      "create",
+      "delete",
+      "set",
+      "merge",
+      "with",
+      "union",
+      "all",
+      "distinct",
+      "limit",
+      "skip",
+      "desc",
+      "asc",
+      "and",
+      "or",
+      "not",
+      "exists",
+      "in",
+      "as",
+      "from",
+      "to",
       "contains"
     ]
 
@@ -618,6 +672,7 @@ defmodule RyugraphEx.Graph do
       rels: rels
     }
   end
+
   defp format_path(path), do: path
 
   # Normalize node properties to ensure consistency

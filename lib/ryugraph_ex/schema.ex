@@ -36,7 +36,9 @@ defmodule RyugraphEx.Schema do
           | {:array, property_type()}
           | {:map, property_type(), property_type()}
 
-  @type property_def :: {atom() | String.t(), property_type()} | {atom() | String.t(), property_type(), keyword()}
+  @type property_def ::
+          {atom() | String.t(), property_type()}
+          | {atom() | String.t(), property_type(), keyword()}
 
   @doc """
   Creates a node table with the specified properties.
@@ -318,22 +320,25 @@ defmodule RyugraphEx.Schema do
     case Connection.query(conn, "CALL show_tables() RETURN *;") do
       {:ok, results} ->
         # Filter for REL tables
-        rel_tables = results
+        rel_tables =
+          results
           |> Enum.filter(fn row -> Map.get(row, "type") == "REL" end)
           |> Enum.map(fn row -> Map.get(row, "name") end)
 
         # Check which ones reference our node table
-        dependent_tables = Enum.filter(rel_tables, fn rel_table ->
-          # Query table_info to check if it references our node table
-          case Connection.query(conn, "CALL table_info('#{rel_table}') RETURN *;") do
-            {:ok, _info} ->
-              # Check if src or dst reference our table (this is a heuristic)
-              # In reality, RyuGraph doesn't expose this directly
-              true
-            _error ->
-              false
-          end
-        end)
+        dependent_tables =
+          Enum.filter(rel_tables, fn rel_table ->
+            # Query table_info to check if it references our node table
+            case Connection.query(conn, "CALL table_info('#{rel_table}') RETURN *;") do
+              {:ok, _info} ->
+                # Check if src or dst reference our table (this is a heuristic)
+                # In reality, RyuGraph doesn't expose this directly
+                true
+
+              _error ->
+                false
+            end
+          end)
 
         {:ok, dependent_tables}
 
@@ -585,15 +590,40 @@ defmodule RyugraphEx.Schema do
   defp type_to_string(:decimal), do: "DECIMAL"
   defp type_to_string({:list, inner_type}), do: "#{type_to_string(inner_type)}[]"
   defp type_to_string({:array, inner_type}), do: "#{type_to_string(inner_type)}[]"
-  defp type_to_string({:map, key_type, val_type}), do: "MAP(#{type_to_string(key_type)}, #{type_to_string(val_type)})"
+
+  defp type_to_string({:map, key_type, val_type}),
+    do: "MAP(#{type_to_string(key_type)}, #{type_to_string(val_type)})"
 
   # Escape identifier to handle reserved keywords
   defp escape_identifier(name) do
     # List of reserved keywords in RyuGraph/Cypher
     reserved = [
-      "order", "group", "by", "where", "return", "match", "create", "delete",
-      "set", "merge", "with", "union", "all", "distinct", "limit", "skip",
-      "desc", "asc", "and", "or", "not", "exists", "in", "as", "from", "to"
+      "order",
+      "group",
+      "by",
+      "where",
+      "return",
+      "match",
+      "create",
+      "delete",
+      "set",
+      "merge",
+      "with",
+      "union",
+      "all",
+      "distinct",
+      "limit",
+      "skip",
+      "desc",
+      "asc",
+      "and",
+      "or",
+      "not",
+      "exists",
+      "in",
+      "as",
+      "from",
+      "to"
     ]
 
     if String.downcase(name) in reserved do
